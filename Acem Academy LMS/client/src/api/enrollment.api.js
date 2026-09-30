@@ -49,6 +49,27 @@ export const getEnrollmentById = async (
 
 /*
 |--------------------------------------------------------------------------
+| Get Teacher Students
+|--------------------------------------------------------------------------
+|
+| Returns students enrolled in courses created by the
+| currently authenticated teacher.
+|
+| Only ACTIVE and COMPLETED enrollments are returned
+| by the backend.
+|
+*/
+
+export const getTeacherStudents = async () => {
+    const response = await axiosInstance.get(
+        "/enrollments/teacher/students"
+    );
+
+    return response.data;
+};
+
+/*
+|--------------------------------------------------------------------------
 | Start Lesson
 |--------------------------------------------------------------------------
 */

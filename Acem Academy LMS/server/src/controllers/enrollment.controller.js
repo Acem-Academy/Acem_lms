@@ -162,6 +162,30 @@ const completeLesson = asyncHandler(async (req, res) => {
 
 });
 
+
+/*
+|--------------------------------------------------------------------------
+| Get Teacher Students
+|--------------------------------------------------------------------------
+*/
+
+const getTeacherStudents = asyncHandler(async (req, res) => {
+
+    const students =
+        await enrollmentService.getTeacherStudents(
+            req.user._id
+        );
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            students,
+            "Teacher students fetched successfully."
+        )
+    );
+
+});
+
 module.exports = {
     enrollStudent,
     getMyCourses,
@@ -170,4 +194,5 @@ module.exports = {
     cancelEnrollment,
     startLesson,
     completeLesson,
+    getTeacherStudents,
 };

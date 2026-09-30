@@ -43,6 +43,20 @@ router.get(
     enrollmentController.getMyCourses
 );
 
+
+/*
+|--------------------------------------------------------------------------
+| Get Teacher Students
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+    "/teacher/students",
+    authenticate,
+    authorize(ROLES.TEACHER),
+    enrollmentController.getTeacherStudents
+);
+
 /*
 |--------------------------------------------------------------------------
 | Get Enrollment By Id

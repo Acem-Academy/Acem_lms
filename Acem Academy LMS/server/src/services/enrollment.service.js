@@ -609,6 +609,125 @@ const completeLesson = async (
     return enrollment;
 };
 
+
+/*
+|--------------------------------------------------------------------------
+| Get Teacher Students
+|--------------------------------------------------------------------------
+|
+| Returns students enrolled in courses created by the logged-in teacher.
+|
+| Only ACTIVE and COMPLETED enrollments are included.
+|
+*/
+
+const getTeacherStudents = async (teacherId) => {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Find Courses Created By Teacher
+    |--------------------------------------------------------------------------
+    */
+
+    const teacherCourses = await Course.find({
+        teacher: teacherId,
+        isDeleted: false,
+    }).select("_id title courseCode thumbnail");
+
+    if (!teacherCourses.length) {
+        return [];
+    }
+
+    const courseIds = teacherCourses.map(
+        (course) => course._id
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Find Active / Completed Enrollments
+    |--------------------------------------------------------------------------
+    */
+
+    const enrollments = await Enrollment.find({
+        course: {
+            $in: courseIds,
+        },
+
+        status: {
+            $in: [
+                ENROLLMENT_STATUS.ACTIVE,
+                ENROLLMENT_STATUS.COMPLETED,
+            ],
+        },
+    })
+        .populate(
+            "student",
+            "fullName email avatar status"
+        )
+        .populate(
+            "course",
+            "title courseCode thumbnail"
+        )
+        .sort({
+            createdAt: -1,
+        });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Group Enrollments By Student
+    |--------------------------------------------------------------------------
+    |
+    | If one student is enrolled in multiple courses belonging to the
+    | same teacher, the student appears only once.
+    |
+    */
+
+    const studentsMap = new Map();
+
+    for (const enrollment of enrollments) {
+
+        if (!enrollment.student) {
+            continue;
+        }
+
+        const studentId =
+            enrollment.student._id.toString();
+
+        if (!studentsMap.has(studentId)) {
+
+            studentsMap.set(studentId, {
+                student: enrollment.student,
+                courses: [],
+                totalCourses: 0,
+            });
+
+        }
+
+        const studentData =
+            studentsMap.get(studentId);
+
+        studentData.courses.push({
+            enrollmentId: enrollment._id,
+            course: enrollment.course,
+            status: enrollment.status,
+            progress: enrollment.progress,
+            completedLessons:
+                enrollment.completedLessons.length,
+            lastAccessedLesson:
+                enrollment.lastAccessedLesson,
+            enrolledAt: enrollment.enrolledAt,
+            completedAt: enrollment.completedAt,
+        });
+
+        studentData.totalCourses =
+            studentData.courses.length;
+    }
+
+    return Array.from(
+        studentsMap.values()
+    );
+};
+
 module.exports = {
     enrollStudent,
     getMyCourses,
@@ -617,5 +736,6 @@ module.exports = {
     cancelEnrollment,
     startLesson,
     completeLesson,
+    getTeacherStudents,
 };
 

@@ -12,6 +12,7 @@ const {
 const authenticate = require("../middlewares/auth.middleware");
 const authorize = require("../middlewares/authorize.middleware");
 const validate = require("../middlewares/validate.middleware");
+const upload = require("../middlewares/upload.middleware");
 
 const ROLES = require("../constants/roles");
 
@@ -27,6 +28,7 @@ router.post(
     "/",
     authenticate,
     authorize(ROLES.ADMIN, ROLES.TEACHER),
+    upload.single("thumbnail"),
     createCourseValidator,
     validate,
     courseController.createCourse
@@ -82,6 +84,7 @@ router.patch(
     authenticate,
     authorize(ROLES.ADMIN, ROLES.TEACHER),
     courseIdValidator,
+    upload.single("thumbnail"),
     updateCourseValidator,
     validate,
     courseController.updateCourse

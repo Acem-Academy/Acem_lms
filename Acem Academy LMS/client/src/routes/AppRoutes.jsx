@@ -14,6 +14,8 @@ import TeacherCourses from "@/pages/teacher/Courses";
 import CourseManagement from "@/pages/teacher/CourseManagement";
 import EditCourse from "@/pages/teacher/EditCourse";
 import CourseCurriculum from "@/pages/teacher/CourseCurriculum";
+import LessonEditor from "@/pages/teacher/LessonEditor";
+import GetStudents from "@/pages/teacher/GetStudents";
 
 import StudentLayout from "@/layouts/StudentLayout";
 import TeacherLayout from "@/layouts/TeacherLayout";
@@ -24,6 +26,7 @@ import MyLearning from "@/pages/student/MyLearning";
 import CourseDetails from "@/pages/student/CourseDetails";
 import Learning from "@/pages/student/Learning";
 import StudentProfile from "@/pages/student/Profile";
+import MaterialViewer from "@/pages/student/MaterialViewer";
 
 import NotFound from "@/pages/common/NotFound";
 
@@ -152,6 +155,27 @@ function AppRoutes() {
   element={<CourseCurriculum />}
 />
 
+<Route
+    path="courses/create"
+    element={<EditCourse />}
+/>
+
+
+<Route
+    path="courses/:courseId/lessons/:lessonId/edit"
+    element={<LessonEditor />}
+/>
+
+<Route
+    path="courses/:courseId/lessons/:lessonId/edit"
+    element={<LessonEditor />}
+/>
+
+ <Route
+        path="/teacher/students"
+        element={<GetStudents />}
+    />
+
 </Route>
 
         {/* ====================================================== */}
@@ -212,12 +236,22 @@ function AppRoutes() {
             }
           />
 
+           {/* Course Material Viewer */}
+  <Route
+    path="material/:lessonId"
+    element={
+      <MaterialViewer />
+    }
+  />
+
           <Route
             path="profile"
             element={
               <StudentProfile />
             }
           />
+
+          
 
         </Route>
 

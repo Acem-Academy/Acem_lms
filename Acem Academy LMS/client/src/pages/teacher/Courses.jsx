@@ -82,7 +82,7 @@ const TeacherCourses = () => {
                     {/* Create Course */}
 
                     <Link
-                        to="/teacher/courses/create"
+                       to="/teacher/courses/create"
                         className="
                             inline-flex
                             w-fit

@@ -19,7 +19,9 @@ const createCourseValidator = [
         .withMessage("Course title is required")
         .bail()
         .isLength({ min: 3, max: 150 })
-        .withMessage("Course title must be between 3 and 150 characters."),
+        .withMessage(
+            "Course title must be between 3 and 150 characters."
+        ),
 
     body("courseCode")
         .trim()
@@ -32,14 +34,9 @@ const createCourseValidator = [
         .withMessage("Description is required")
         .bail()
         .isLength({ min: 10 })
-        .withMessage("Description must be at least 10 characters."),
-
-    body("teacher")
-        .notEmpty()
-        .withMessage("Teacher is required")
-        .bail()
-        .isMongoId()
-        .withMessage("Invalid teacher id."),
+        .withMessage(
+            "Description must be at least 10 characters."
+        ),
 
     body("price")
         .optional()
@@ -69,7 +66,9 @@ const updateCourseValidator = [
         .optional()
         .trim()
         .isLength({ min: 3, max: 150 })
-        .withMessage("Course title must be between 3 and 150 characters."),
+        .withMessage(
+            "Course title must be between 3 and 150 characters."
+        ),
 
     body("courseCode")
         .optional()

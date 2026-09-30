@@ -1,0 +1,44 @@
+/* Clean math presentation shared by teacher and student lesson content. */
+.acem-lesson-quill .ql-editor,
+.acem-lesson-quill-readonly .ql-editor {
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.85;
+}
+
+.acem-lesson-quill .ql-formula,
+.acem-lesson-quill-readonly .ql-formula {
+    display: inline-block;
+    margin: 0 0.12em;
+    vertical-align: middle;
+}
+
+.acem-lesson-reader .ql-container.ql-snow {
+    border: 0;
+}
+
+.acem-lesson-reader .ql-editor {
+    padding: 0;
+    color: inherit;
+}
+
+.acem-lesson-reader .ql-editor p {
+    margin-bottom: 0.9rem;
+}
+
+.acem-lesson-reader .ql-editor h1,
+.acem-lesson-reader .ql-editor h2,
+.acem-lesson-reader .ql-editor h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.acem-lesson-reader .ql-editor .ql-formula {
+    font-size: 1.12em;
+}
+
+.acem-lesson-reader .katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.5rem 0;
+}

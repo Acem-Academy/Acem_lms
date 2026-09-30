@@ -979,7 +979,7 @@ const TeacherDashboard = () => {
 
                             {/* Future Assignment */}
 
-                            <div
+                            {/* <div
                                 className="
                                     flex
                                     items-center
@@ -1038,7 +1038,7 @@ const TeacherDashboard = () => {
 
                                 </div>
 
-                            </div>
+                            </div> */}
 
                         </div>
 

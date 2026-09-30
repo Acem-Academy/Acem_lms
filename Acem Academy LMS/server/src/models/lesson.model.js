@@ -4,6 +4,106 @@ const {
     LESSON_STATUS,
 } = require("../constants/lesson.constants");
 
+/*
+|--------------------------------------------------------------------------
+| Quiz Question Schema
+|--------------------------------------------------------------------------
+*/
+
+const quizQuestionSchema = new mongoose.Schema(
+    {
+        question: {
+            type: String,
+            required: [true, "Question is required"],
+            trim: true,
+            maxlength: 2000,
+        },
+
+        options: {
+            type: [String],
+            required: [true, "Question options are required"],
+            validate: {
+                validator: function (options) {
+                    return options.length >= 2;
+                },
+                message: "A question must have at least 2 options.",
+            },
+        },
+
+        correctAnswer: {
+            type: Number,
+            required: [true, "Correct answer is required"],
+            min: 0,
+        },
+
+        points: {
+            type: Number,
+            default: 1,
+            min: 1,
+        },
+
+        explanation: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: 2000,
+        },
+    },
+    {
+        _id: true,
+    }
+);
+
+/*
+|--------------------------------------------------------------------------
+| Quiz Schema
+|--------------------------------------------------------------------------
+*/
+
+const quizSchema = new mongoose.Schema(
+    {
+        enabled: {
+            type: Boolean,
+            default: false,
+        },
+
+        title: {
+            type: String,
+            default: "Lesson Quiz",
+            trim: true,
+            maxlength: 200,
+        },
+
+        description: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: 2000,
+        },
+
+        passingScore: {
+            type: Number,
+            default: 70,
+            min: 0,
+            max: 100,
+        },
+
+        maxAttempts: {
+            type: Number,
+            default: 1,
+            min: 1,
+        },
+
+        questions: {
+            type: [quizQuestionSchema],
+            default: [],
+        },
+    },
+    {
+        _id: true,
+    }
+);
+
 const lessonSchema = new mongoose.Schema(
     {
         title: {
@@ -38,32 +138,37 @@ const lessonSchema = new mongoose.Schema(
             default: null,
         },
 
-        /*
-        |--------------------------------------------------------------------------
-        | Video
-        |--------------------------------------------------------------------------
-        */
+       /*
+|--------------------------------------------------------------------------
+| Video
+|--------------------------------------------------------------------------
+*/
 
-        video: {
-            url: {
-                type: String,
-                default: "",
-                trim: true,
-            },
+video: {
+    type: {
+        type: String,
+        enum: ["youtube", "upload"],
+        default: "youtube",
+    },
 
-            duration: {
-                type: Number,
-                default: 0,
-                min: 0,
-            },
+    url: {
+        type: String,
+        default: "",
+        trim: true,
+    },
 
-            thumbnail: {
-                type: String,
-                default: "",
-                trim: true,
-            },
-        },
+    duration: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
 
+    thumbnail: {
+        type: String,
+        default: "",
+        trim: true,
+    },
+},
         /*
         |--------------------------------------------------------------------------
         | Attachments
@@ -88,6 +193,17 @@ const lessonSchema = new mongoose.Schema(
                 },
             },
         ],
+
+/*
+|--------------------------------------------------------------------------
+| Quiz
+|--------------------------------------------------------------------------
+*/
+
+quiz: {
+    type: quizSchema,
+    default: null,
+},
 
         /*
         |--------------------------------------------------------------------------
