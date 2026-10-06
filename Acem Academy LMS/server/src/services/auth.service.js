@@ -46,6 +46,8 @@ const generateRefreshToken = (userId) => {
 /*                               Register User                                */
 /* -------------------------------------------------------------------------- */
 
+const PUBLIC_REGISTRATION_FIELDS = ["fullName", "email", "password"];
+
 const registerUser = async (userData) => {
     const { email, password } = userData;
 
@@ -57,10 +59,15 @@ const registerUser = async (userData) => {
 
     const hashedPassword = await hashPassword(password);
 
-    const user = await User.create({
-        ...userData,
-        password: hashedPassword,
-    });
+    const newUser = {};
+
+    for (const field of PUBLIC_REGISTRATION_FIELDS) {
+        newUser[field] = userData[field];
+    }
+
+    newUser.password = hashedPassword;
+
+    const user = await User.create(newUser);
 
     const createdUser = await User.findById(user._id)
         .select("-password -refreshToken");
