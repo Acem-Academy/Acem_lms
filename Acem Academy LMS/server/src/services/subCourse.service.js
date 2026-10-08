@@ -4,6 +4,10 @@ const Course = require("../models/course.model");
 const ApiError = require("../utils/ApiError");
 
 const {
+    assertCurriculumOwnership,
+} = require("../utils/ownership");
+
+const {
     COURSE_STATUS,
 } = require("../constants/course.constants");
 
@@ -40,6 +44,18 @@ const createSubCourse = async (
             "Course not found."
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Check Course Ownership
+    |--------------------------------------------------------------------------
+    */
+
+    await assertCurriculumOwnership(
+        "course",
+        course._id,
+        user
+    );
 
     /*
     |--------------------------------------------------------------------------
@@ -151,7 +167,8 @@ const getSubCourses = async (courseId) => {
 */
 
 const getSubCourseById = async (
-    subCourseId
+    subCourseId,
+    user
 ) => {
 
     const subCourse = await SubCourse.findOne({
@@ -168,6 +185,12 @@ const getSubCourseById = async (
             "Sub Course not found."
         );
     }
+
+    await assertCurriculumOwnership(
+        "subCourse",
+        subCourseId,
+        user
+    );
 
     return subCourse;
 
@@ -196,6 +219,12 @@ const updateSubCourse = async (
             "Sub Course not found."
         );
     }
+
+    await assertCurriculumOwnership(
+        "subCourse",
+        subCourseId,
+        user
+    );
 
     if (
         updateData.position &&
@@ -253,6 +282,12 @@ const deleteSubCourse = async (
         );
     }
 
+    await assertCurriculumOwnership(
+        "subCourse",
+        subCourseId,
+        user
+    );
+
     subCourse.isDeleted = true;
 
     subCourse.updatedBy = user._id;
@@ -284,6 +319,12 @@ const publishSubCourse = async (
             "Sub Course not found."
         );
     }
+
+    await assertCurriculumOwnership(
+        "subCourse",
+        subCourseId,
+        user
+    );
 
     subCourse.status = body.status;
 

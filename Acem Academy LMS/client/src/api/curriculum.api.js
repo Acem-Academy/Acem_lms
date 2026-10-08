@@ -238,3 +238,17 @@ export const updateLessonStatus = async (
 
     return response.data;
 };
+
+export const submitQuiz = async (
+    lessonId,
+    answers
+) => {
+    const response = await axiosInstance.post(
+        `/lessons/${lessonId}/quiz/submit`,
+        {
+            answers,
+        }
+    );
+
+    return response.data;
+};

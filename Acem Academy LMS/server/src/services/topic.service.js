@@ -4,6 +4,10 @@ const Chapter = require("../models/chapter.model");
 const ApiError = require("../utils/ApiError");
 
 const {
+    assertCurriculumOwnership,
+} = require("../utils/ownership");
+
+const {
     TOPIC_STATUS,
 } = require("../constants/topic.constants");
 
@@ -36,6 +40,12 @@ const createTopic = async (
             "Chapter not found."
         );
     }
+
+    await assertCurriculumOwnership(
+        "chapter",
+        chapter._id,
+        user
+    );
 
     /*
     |--------------------------------------------------------------------------
@@ -128,7 +138,8 @@ const getTopics = async (chapterId) => {
 */
 
 const getTopicById = async (
-    topicId
+    topicId,
+    user
 ) => {
 
     const topic = await Topic.findOne({
@@ -145,6 +156,12 @@ const getTopicById = async (
             "Topic not found."
         );
     }
+
+    await assertCurriculumOwnership(
+        "topic",
+        topicId,
+        user
+    );
 
     return topic;
 
@@ -173,6 +190,12 @@ const updateTopic = async (
             "Topic not found."
         );
     }
+
+    await assertCurriculumOwnership(
+        "topic",
+        topicId,
+        user
+    );
 
     if (
         updateData.position &&
@@ -230,6 +253,12 @@ const deleteTopic = async (
         );
     }
 
+    await assertCurriculumOwnership(
+        "topic",
+        topicId,
+        user
+    );
+
     topic.isDeleted = true;
 
     topic.updatedBy = user._id;
@@ -261,6 +290,12 @@ const publishTopic = async (
             "Topic not found."
         );
     }
+
+    await assertCurriculumOwnership(
+        "topic",
+        topicId,
+        user
+    );
 
     topic.status = body.status;
 

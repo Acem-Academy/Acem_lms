@@ -7,6 +7,7 @@ const {
     updateLessonValidator,
     lessonIdValidator,
     publishLessonValidator,
+    submitQuizValidator,
 } = require("../validators/lesson.validator");
 
 const authenticate = require("../middlewares/auth.middleware");
@@ -128,6 +129,21 @@ router.get(
     lessonIdValidator,
     validate,
     lessonController.getLessonById
+);
+
+/*
+|--------------------------------------------------------------------------
+| Submit Lesson Quiz
+|--------------------------------------------------------------------------
+*/
+
+router.post(
+    "/:lessonId/quiz/submit",
+    authenticate,
+    lessonIdValidator,
+    submitQuizValidator,
+    validate,
+    lessonController.submitQuiz
 );
 
 /*

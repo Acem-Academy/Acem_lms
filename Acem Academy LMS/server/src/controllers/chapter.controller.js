@@ -57,7 +57,8 @@ const getChapters = asyncHandler(async (req, res) => {
 const getChapterById = asyncHandler(async (req, res) => {
 
     const chapter = await chapterService.getChapterById(
-        req.params.chapterId
+        req.params.chapterId,
+        req.user
     );
 
     return res.status(200).json(

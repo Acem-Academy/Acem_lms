@@ -36,7 +36,8 @@ const createLesson = asyncHandler(async (req, res) => {
 const getLessons = asyncHandler(async (req, res) => {
 
     const lessons = await lessonService.getLessons(
-        req.query.topic
+        req.query.topic,
+        req.user
     );
 
     return res.status(200).json(
@@ -58,7 +59,8 @@ const getLessons = asyncHandler(async (req, res) => {
 const getLessonById = asyncHandler(async (req, res) => {
 
     const lesson = await lessonService.getLessonById(
-        req.params.lessonId
+        req.params.lessonId,
+        req.user
     );
 
     return res.status(200).json(
@@ -66,6 +68,30 @@ const getLessonById = asyncHandler(async (req, res) => {
             200,
             lesson,
             "Lesson fetched successfully"
+        )
+    );
+
+});
+
+/*
+|--------------------------------------------------------------------------
+| Submit Quiz
+|--------------------------------------------------------------------------
+*/
+
+const submitQuiz = asyncHandler(async (req, res) => {
+
+    const result = await lessonService.submitQuiz(
+        req.params.lessonId,
+        req.body.answers,
+        req.user
+    );
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            result,
+            "Quiz submitted successfully"
         )
     );
 
@@ -147,6 +173,7 @@ module.exports = {
     createLesson,
     getLessons,
     getLessonById,
+    submitQuiz,
     updateLesson,
     deleteLesson,
     publishLesson,

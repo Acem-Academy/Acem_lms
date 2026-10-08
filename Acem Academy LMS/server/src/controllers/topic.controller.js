@@ -57,7 +57,8 @@ const getTopics = asyncHandler(async (req, res) => {
 const getTopicById = asyncHandler(async (req, res) => {
 
     const topic = await topicService.getTopicById(
-        req.params.topicId
+        req.params.topicId,
+        req.user
     );
 
     return res.status(200).json(

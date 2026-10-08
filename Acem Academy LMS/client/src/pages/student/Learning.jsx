@@ -43,6 +43,7 @@ import {
     getChapters,
     getTopics,
     getLessons,
+    submitQuiz,
 } from "@/api/curriculum.api";
 
 import MathText from "@/components/forms/MathText";
@@ -982,7 +983,7 @@ const Learning = () => {
         setQuizQuestionIndex((prev) => prev - 1);
     };
 
-    const handleQuizSubmit = () => {
+    const handleQuizSubmit = async () => {
         if (!quizQuestions.length) {
             return;
         }
@@ -995,32 +996,41 @@ const Learning = () => {
             return;
         }
 
-        let earnedPoints = 0;
-        let totalPoints = 0;
+        /*
+        |------------------------------------------------------------------
+        | Server-Side Scoring
+        |------------------------------------------------------------------
+        |
+        | The answer key is no longer part of the lesson payload, so the
+        | backend scores the attempt and only returns the result.
+        |
+        */
 
-        quizQuestions.forEach((question, index) => {
-            const points = Number(question.points) > 0 ? Number(question.points) : 1;
-            totalPoints += points;
+        try {
+            const response = await submitQuiz(
+                selectedLesson._id,
+                quizQuestions.map((_, index) =>
+                    Number(quizAnswers[index])
+                )
+            );
 
-            if (Number(quizAnswers[index]) === Number(question.correctAnswer)) {
-                earnedPoints += points;
+            const result = response?.data;
+
+            if (!result) {
+                throw new Error("Invalid quiz response.");
             }
-        });
 
-        const percentage =
-            totalPoints > 0
-                ? Math.round((earnedPoints / totalPoints) * 100)
-                : 0;
+            setQuizScore({
+                earnedPoints: result.earnedPoints,
+                totalPoints: result.totalPoints,
+                percentage: result.percentage,
+                passed: result.passed === true,
+            });
 
-        setQuizScore({
-            earnedPoints,
-            totalPoints,
-            percentage,
-            passed:
-                percentage >= Number(selectedLesson.quiz.passingScore ?? 70),
-        });
-
-        setQuizSubmitted(true);
+            setQuizSubmitted(true);
+        } catch (error) {
+            console.error("Failed to submit quiz:", error);
+        }
     };
 
     const handleQuizReset = () => {
@@ -2153,7 +2163,7 @@ const Learning = () => {
                                                 className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/10 px-4 py-2.5 text-sm font-bold text-[var(--color-primary)] transition hover:bg-[var(--color-primary)]/20"
                                             >
                                                 <FileText size={16} />
-                                                Read Material
+                                                View Notes
                                                 <ExternalLink size={15} />
                                             </button>
                                         )}

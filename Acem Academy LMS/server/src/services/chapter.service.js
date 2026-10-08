@@ -4,6 +4,10 @@ const SubCourse = require("../models/subCourse.model");
 const ApiError = require("../utils/ApiError");
 
 const {
+    assertCurriculumOwnership,
+} = require("../utils/ownership");
+
+const {
     CHAPTER_STATUS,
 } = require("../constants/chapter.constants");
 
@@ -29,6 +33,12 @@ const createChapter = async (
             "Sub Course not found."
         );
     }
+
+    await assertCurriculumOwnership(
+        "subCourse",
+        subCourse._id,
+        user
+    );
 
     if (!chapterData.position) {
 
@@ -102,7 +112,8 @@ const getChapters = async (subCourseId) => {
 */
 
 const getChapterById = async (
-    chapterId
+    chapterId,
+    user
 ) => {
 
     const chapter = await Chapter.findOne({
@@ -119,6 +130,12 @@ const getChapterById = async (
             "Chapter not found."
         );
     }
+
+    await assertCurriculumOwnership(
+        "chapter",
+        chapterId,
+        user
+    );
 
     return chapter;
 
@@ -147,6 +164,12 @@ const updateChapter = async (
             "Chapter not found."
         );
     }
+
+    await assertCurriculumOwnership(
+        "chapter",
+        chapterId,
+        user
+    );
 
     if (
         updateData.position &&
@@ -205,6 +228,12 @@ const deleteChapter = async (
         );
     }
 
+    await assertCurriculumOwnership(
+        "chapter",
+        chapterId,
+        user
+    );
+
     chapter.isDeleted = true;
 
     chapter.updatedBy = user._id;
@@ -236,6 +265,12 @@ const publishChapter = async (
             "Chapter not found."
         );
     }
+
+    await assertCurriculumOwnership(
+        "chapter",
+        chapterId,
+        user
+    );
 
     chapter.status = body.status;
 

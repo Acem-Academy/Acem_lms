@@ -9,6 +9,16 @@ const {
 
 const { uploadToCloudinary } = require("../utils/cloudinary");
 
+const COURSE_UPDATE_FIELDS = [
+    "title",
+    "courseCode",
+    "description",
+    "price",
+    "duration",
+    "visibility",
+    "thumbnail",
+];
+
 /* -------------------------------------------------------------------------- */
 /*                              Create Course                                 */
 /* -------------------------------------------------------------------------- */
@@ -195,10 +205,13 @@ const updateCourse = async (
     |--------------------------------------------------------------------------
     */
 
-    const updateData = {
-        ...body,
-        updatedBy: user._id,
-    };
+    const updateData = { updatedBy: user._id };
+
+    for (const key of COURSE_UPDATE_FIELDS) {
+        if (body[key] !== undefined) {
+            updateData[key] = body[key];
+        }
+    }
 
     /*
     |--------------------------------------------------------------------------

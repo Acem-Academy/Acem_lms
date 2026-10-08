@@ -57,7 +57,8 @@ const getSubCourses = asyncHandler(async (req, res) => {
 const getSubCourseById = asyncHandler(async (req, res) => {
 
     const subCourse = await subCourseService.getSubCourseById(
-        req.params.subCourseId
+        req.params.subCourseId,
+        req.user
     );
 
     return res.status(200).json(

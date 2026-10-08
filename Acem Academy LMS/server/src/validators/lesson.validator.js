@@ -538,9 +538,31 @@ const publishLessonValidator = [
         ),
 ];
 
+/*
+|--------------------------------------------------------------------------
+| Submit Quiz
+|--------------------------------------------------------------------------
+*/
+
+const submitQuizValidator = [
+
+    body("answers")
+        .isArray({ min: 1 })
+        .withMessage(
+            "Answers must be a non-empty array."
+        ),
+
+    body("answers.*")
+        .isInt({ min: 0 })
+        .withMessage(
+            "Each answer must be a non-negative integer."
+        ),
+];
+
 module.exports = {
     createLessonValidator,
     updateLessonValidator,
     lessonIdValidator,
     publishLessonValidator,
+    submitQuizValidator,
 };
