@@ -11,6 +11,12 @@ const {
     CHAPTER_STATUS,
 } = require("../constants/chapter.constants");
 
+const CHAPTER_UPDATE_FIELDS = [
+    "title",
+    "description",
+    "position",
+];
+
 /*
 |--------------------------------------------------------------------------
 | Create Chapter
@@ -191,10 +197,11 @@ const updateChapter = async (
 
     }
 
-    Object.assign(
-        chapter,
-        updateData
-    );
+    for (const key of CHAPTER_UPDATE_FIELDS) {
+        if (updateData[key] !== undefined) {
+            chapter[key] = updateData[key];
+        }
+    }
 
     chapter.updatedBy = user._id;
 

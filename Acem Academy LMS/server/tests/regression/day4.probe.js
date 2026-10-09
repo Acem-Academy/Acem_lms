@@ -241,13 +241,14 @@ const expectStatus = async (name, expected /* array */, p) => {
     await expectOk("9.22 admin bypass: getLessonById", () => lessonService.getLessonById(L2, adminUser));
     await expectOk("9.23 owner teacher: getLessonById (C3/C4 read)", () => lessonService.getLessonById(L2, { _id: new mongoose.Types.ObjectId(TEACHER), role: "teacher" }));
 
-    /* ---- Phase 10: curriculum UPDATE mass-assignment probe (temp doc only) ---- */
-    const ma = await req("PATCH", `/sub-courses/${S3}`, { who: TEACHER, json: { title: "D4 Sub C PATCHED", isDeleted: true, createdBy: STUDENT, course: "6a7ec982c66e8b43dd2ccd8e" } });
+    /* ---- Phase 10: curriculum UPDATE mass-assignment blocked (H-1) ---- */
+    const ma = await req("PATCH", `/sub-courses/${S3}`, { who: TEACHER, json: { title: "D4 Sub C PATCHED", isDeleted: true, status: "published", createdBy: STUDENT, course: "6a7ec982c66e8b43dd2ccd8e" } });
     const maGet = await req("GET", `/sub-courses/${S3}`, { who: TEACHER });
-    check("10.1 curriculum UPDATE mass-assignment (isDeleted client-settable)", ma.status === 200 && maGet.status === 404, `patch=${ma.status} getAfter=${maGet.status}`);
-    const maDoc = await mongoose.connection.db.collection("subcourses").findOne({ _id: new mongoose.Types.ObjectId(S3) }, { projection: { createdBy: 1, course: 1, isDeleted: 1, title: 1 } });
-    check("10.2 createdBy/course also client-settable", maDoc && maDoc.createdBy && maDoc.createdBy.toString() === STUDENT && maDoc.course.toString() === "6a7ec982c66e8b43dd2ccd8e" && maDoc.isDeleted === true,
-        JSON.stringify({ createdBy: maDoc && maDoc.createdBy && maDoc.createdBy.toString(), course: maDoc && maDoc.course && maDoc.course.toString(), isDeleted: maDoc && maDoc.isDeleted }));
+    check("10.1 H-1: allowed title updates, isDeleted/status ignored", ma.status === 200 && maGet.status === 200 && maGet.data && maGet.data.title === "D4 Sub C PATCHED",
+        `patch=${ma.status} getAfter=${maGet.status} title=${maGet.data && maGet.data.title}`);
+    const maDoc = await mongoose.connection.db.collection("subcourses").findOne({ _id: new mongoose.Types.ObjectId(S3) }, { projection: { createdBy: 1, course: 1, isDeleted: 1, status: 1 } });
+    check("10.2 H-1: createdBy/course/isDeleted/status cannot be reassigned", maDoc && maDoc.createdBy && maDoc.createdBy.toString() === TEACHER && maDoc.course.toString() === T && maDoc.isDeleted === false && maDoc.status === "draft",
+        JSON.stringify({ createdBy: maDoc && maDoc.createdBy && maDoc.createdBy.toString(), course: maDoc && maDoc.course && maDoc.course.toString(), isDeleted: maDoc && maDoc.isDeleted, status: maDoc && maDoc.status }));
 
     /* ---- Phase 11: course delete + orphan behavior ---- */
     await expect11();

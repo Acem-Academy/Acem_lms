@@ -11,6 +11,12 @@ const {
     TOPIC_STATUS,
 } = require("../constants/topic.constants");
 
+const TOPIC_UPDATE_FIELDS = [
+    "title",
+    "description",
+    "position",
+];
+
 
 /*
 |--------------------------------------------------------------------------
@@ -217,10 +223,11 @@ const updateTopic = async (
 
     }
 
-    Object.assign(
-        topic,
-        updateData
-    );
+    for (const key of TOPIC_UPDATE_FIELDS) {
+        if (updateData[key] !== undefined) {
+            topic[key] = updateData[key];
+        }
+    }
 
     topic.updatedBy = user._id;
 

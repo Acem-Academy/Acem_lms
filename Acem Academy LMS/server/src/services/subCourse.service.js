@@ -15,6 +15,12 @@ const {
     SUBCOURSE_STATUS,
 } = require("../constants/subCourse.constants");
 
+const SUBCOURSE_UPDATE_FIELDS = [
+    "title",
+    "description",
+    "position",
+];
+
 
 /*
 |--------------------------------------------------------------------------
@@ -246,10 +252,11 @@ const updateSubCourse = async (
 
     }
 
-    Object.assign(
-        subCourse,
-        updateData
-    );
+    for (const key of SUBCOURSE_UPDATE_FIELDS) {
+        if (updateData[key] !== undefined) {
+            subCourse[key] = updateData[key];
+        }
+    }
 
     subCourse.updatedBy = user._id;
 
