@@ -268,6 +268,21 @@ const [deleteLoading, setDeleteLoading] = useState(false);
 
 
                 {/* ================================================= */}
+                {/* Success */}
+                {/* ================================================= */}
+
+                {success && (
+                    <div className="mt-6 rounded-2xl border border-green-900 bg-green-950/30 p-6">
+
+                        <p className="text-sm text-green-400">
+                            {success}
+                        </p>
+
+                    </div>
+                )}
+
+
+                {/* ================================================= */}
                 {/* Course Overview */}
                 {/* ================================================= */}
 
