@@ -956,13 +956,13 @@ const updateLesson = async (
     |--------------------------------------------------------------------------
     */
 
+    const newAttachments = [];
+
     if (
         files?.attachments &&
         Array.isArray(files.attachments) &&
         files.attachments.length > 0
     ) {
-        const newAttachments = [];
-
         for (
             const file of files.attachments
         ) {
@@ -1000,15 +1000,48 @@ const updateLesson = async (
                     file.mimetype,
             });
         }
+    }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Preserve Existing Attachments + Add New
-        |--------------------------------------------------------------------------
-        */
+    /*
+    |--------------------------------------------------------------------------
+    | Keep Remaining Existing Attachments + Add New
+    |--------------------------------------------------------------------------
+    |
+    | The editor sends the attachments that are still attached via
+    | existingAttachments. Only entries that already belong to this
+    | lesson are kept (so the list cannot be spoofed) and removed
+    | attachments are dropped.
+    |
+    */
+
+    if (
+        updateData.existingAttachments !== undefined ||
+        newAttachments.length > 0
+    ) {
+        let keptAttachments =
+            lesson.attachments || [];
+
+        if (
+            Array.isArray(
+                updateData.existingAttachments
+            )
+        ) {
+            const existingUrls = new Set(
+                (lesson.attachments || []).map(
+                    (attachment) => attachment.url
+                )
+            );
+
+            keptAttachments =
+                updateData.existingAttachments.filter(
+                    (attachment) =>
+                        attachment &&
+                        existingUrls.has(attachment.url)
+                );
+        }
 
         lesson.attachments = [
-            ...(lesson.attachments || []),
+            ...keptAttachments,
             ...newAttachments,
         ];
 
