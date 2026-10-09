@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Clock3, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getCourseById } from "@/api/course.api";
+import { getCourseById, deleteCourse } from "@/api/course.api";
 import { updateCourseStatus } from "@/api/teacher.api";
 import { useNavigate } from "react-router-dom";
 
@@ -16,6 +16,7 @@ const [loading, setLoading] = useState(true);
 const [error, setError] = useState("");
 const [success, setSuccess] = useState("");
 const [statusLoading, setStatusLoading] = useState(false);
+const [deleteLoading, setDeleteLoading] = useState(false);
 
     useEffect(() => {
 
@@ -101,6 +102,47 @@ const [statusLoading, setStatusLoading] = useState(false);
     }
 
 };
+
+
+    const handleDelete = async () => {
+
+        const confirmed = window.confirm(
+            `Are you sure you want to delete "${course.title}"?`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+
+            setDeleteLoading(true);
+            setError("");
+            setSuccess("");
+
+            await deleteCourse(courseId);
+
+            navigate("/teacher/courses");
+
+        } catch (error) {
+
+            console.error(
+                "Failed to delete course:",
+                error
+            );
+
+            setError(
+                error?.response?.data?.message ||
+                "Unable to delete course."
+            );
+
+        } finally {
+
+            setDeleteLoading(false);
+
+        }
+
+    };
 
 
     /* ========================================================= */
@@ -464,6 +506,8 @@ const [statusLoading, setStatusLoading] = useState(false);
 
     <button
         type="button"
+        onClick={handleDelete}
+        disabled={deleteLoading}
         className="
             w-full
             rounded-xl
@@ -478,7 +522,7 @@ const [statusLoading, setStatusLoading] = useState(false);
             hover:bg-red-950
         "
     >
-        Delete Course
+        {deleteLoading ? "Deleting..." : "Delete Course"}
     </button>
 
 </div>

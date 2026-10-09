@@ -55,3 +55,11 @@ export const updateCourseStatus = async (courseId, status) => {
 
     return response.data;
 };
+
+export const deleteCourse = async (courseId) => {
+    const response = await axiosInstance.delete(
+        `/courses/${courseId}`
+    );
+
+    return response.data;
+};
