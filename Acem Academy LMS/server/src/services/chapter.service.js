@@ -44,7 +44,6 @@ const createChapter = async (
 
         const lastChapter = await Chapter.findOne({
             subCourse: subCourse._id,
-            isDeleted: false,
         }).sort({
             position: -1,
         });
@@ -57,13 +56,14 @@ const createChapter = async (
     const existingPosition = await Chapter.findOne({
         subCourse: subCourse._id,
         position: chapterData.position,
-        isDeleted: false,
     });
 
     if (existingPosition) {
         throw new ApiError(
             409,
-            "Position already exists."
+            existingPosition.isDeleted
+                ? "Position is held by a deleted item. Choose another position."
+                : "Position already exists."
         );
     }
 

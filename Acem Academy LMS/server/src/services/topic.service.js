@@ -57,7 +57,6 @@ const createTopic = async (
 
         const lastTopic = await Topic.findOne({
             chapter: chapter._id,
-            isDeleted: false,
         }).sort({
             position: -1,
         });
@@ -76,13 +75,14 @@ const createTopic = async (
     const existingPosition = await Topic.findOne({
         chapter: chapter._id,
         position: topicData.position,
-        isDeleted: false,
     });
 
     if (existingPosition) {
         throw new ApiError(
             409,
-            "Position already exists."
+            existingPosition.isDeleted
+                ? "Position is held by a deleted item. Choose another position."
+                : "Position already exists."
         );
     }
 

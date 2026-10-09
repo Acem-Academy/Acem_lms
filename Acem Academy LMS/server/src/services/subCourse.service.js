@@ -81,7 +81,6 @@ const createSubCourse = async (
         const lastSubCourse = await SubCourse
             .findOne({
                 course: course._id,
-                isDeleted: false,
             })
             .sort({
                 position: -1,
@@ -101,13 +100,14 @@ const createSubCourse = async (
     const existingPosition = await SubCourse.findOne({
         course: course._id,
         position: subCourseData.position,
-        isDeleted: false,
     });
 
     if (existingPosition) {
         throw new ApiError(
             409,
-            "Position already exists."
+            existingPosition.isDeleted
+                ? "Position is held by a deleted item. Choose another position."
+                : "Position already exists."
         );
     }
 

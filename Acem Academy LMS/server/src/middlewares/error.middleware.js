@@ -9,7 +9,15 @@ const errorHandler = (err, req, res, next) => {
 
     let error = err;
 
-    if (!(error instanceof ApiError)) {
+    if (
+        error &&
+        error.code === 11000
+    ) {
+        error = new ApiError(
+            409,
+            "Duplicate value. The resource already exists."
+        );
+    } else if (!(error instanceof ApiError)) {
         error = new ApiError(
             error.statusCode || 500,
             error.message || "Internal Server Error"

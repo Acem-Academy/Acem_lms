@@ -185,7 +185,6 @@ const createLesson = async (
     if (!lessonData.position) {
         const lastLesson = await Lesson.findOne({
             topic: topic._id,
-            isDeleted: false,
         }).sort({
             position: -1,
         });
@@ -198,13 +197,14 @@ const createLesson = async (
     const existingPosition = await Lesson.findOne({
         topic: topic._id,
         position: lessonData.position,
-        isDeleted: false,
     });
 
     if (existingPosition) {
         throw new ApiError(
             409,
-            "Position already exists."
+            existingPosition.isDeleted
+                ? "Position is held by a deleted item. Choose another position."
+                : "Position already exists."
         );
     }
 
