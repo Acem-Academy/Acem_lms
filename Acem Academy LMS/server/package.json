@@ -5,7 +5,10 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test:regression": "node tests/regression/run.js",
+    "test:h10": "node tests/regression/run.js h10",
+    "test:day4": "node tests/regression/run.js day4"
   },
   "keywords": [],
   "author": "",
