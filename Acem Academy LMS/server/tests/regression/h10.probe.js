@@ -86,11 +86,11 @@ const positionsAsc = (list) => list.every((l, i) => i === 0 || l.position >= lis
     const eTopic = await get(USERS.enrolled, `/lessons?topic=${TOPIC_HTML}`);
     const eList = Array.isArray(eTopic.data) ? eTopic.data : [];
     check("4a. enrolled GET /lessons?topic => 200", eTopic.status === 200, `status=${eTopic.status}`);
-    check("4b. full lesson set incl. draft (existing behavior)", eList.length === 3, `n=${eList.length}`);
+    check("4b. enrolled sees only published lessons (drafts hidden)", eList.length === 2, `n=${eList.length}`);
     const first = eList.find((l) => l._id === PUBLISHED_LESSON) || eList[0] || {};
     check("4c. content present", "content" in first && first.content !== null && first.content !== undefined, `contentExcerpt=${JSON.stringify(String(first.content).slice(0, 40))}`);
     check("4d. video + attachments keys present", "video" in first && "attachments" in first, `keys=${Object.keys(first).join(",")}`);
-    check("4e. quiz key present (draft lesson has quiz)", eList.some((l) => "quiz" in l), `withQuizKey=${eList.filter((l) => "quiz" in l).length}`);
+    check("4e. draft lesson absent from enrolled list", !eList.some((l) => l._id === DRAFT_LESSON), `ids=${JSON.stringify(eList.map((l) => l._id))}`);
     const questions = eList.flatMap((l) => (l.quiz && Array.isArray(l.quiz.questions) ? l.quiz.questions : []));
     const keyLeak = questions.some((q) => "correctAnswer" in q || "explanation" in q);
     check("4f. correctAnswer + explanation stripped for student", !keyLeak, `q=${questions.length} leak=${keyLeak}`);
@@ -124,14 +124,13 @@ const positionsAsc = (list) => list.every((l, i) => i === 0 || l.position >= lis
     const byIdEnrolled = await get(USERS.enrolled, `/lessons/${PUBLISHED_LESSON}`);
     check("7b. enrolled GET /lessons/:id => 200", byIdEnrolled.status === 200, `status=${byIdEnrolled.status}`);
 
-    // 8. C4 quiz submit still works + still protected
-    const submit = await post(USERS.enrolled, `/lessons/${DRAFT_LESSON}/quiz/submit`, { answers: [1, 2] });
-    const d = submit.data || {};
-    const submitKeys = submit.data ? Object.keys(submit.data).sort().join(",") : "";
-    check("8a. enrolled quiz submit => 200 score result", submit.status === 200 && "percentage" in d && "passed" in d, `status=${submit.status} keys=${submitKeys}`);
-    check("8b. submit response leaks no answer key", submitKeys === "earnedPoints,passed,percentage,totalPoints", `keys=${submitKeys}`);
+    // 8. Quiz submit honours publication visibility (draft lesson hidden)
+    const submitDraft = await post(USERS.enrolled, `/lessons/${DRAFT_LESSON}/quiz/submit`, { answers: [1, 2] });
+    check("8a. enrolled quiz submit on DRAFT lesson => 404 (hidden)", submitDraft.status === 404, `status=${submitDraft.status}`);
+    const submitPub = await post(USERS.enrolled, `/lessons/${PUBLISHED_LESSON}/quiz/submit`, { answers: [0] });
+    check("8b. enrolled quiz submit on published lesson reached (no active quiz => 400)", submitPub.status === 400, `status=${submitPub.status} msg=${JSON.stringify(submitPub.raw && submitPub.raw.message)}`);
     const submitDeny = await post(USERS.unenrolled, `/lessons/${DRAFT_LESSON}/quiz/submit`, { answers: [1, 2] });
-    check("8c. unenrolled quiz submit => 403 (C4 intact)", submitDeny.status === 403, `status=${submitDeny.status}`);
+    check("8c. unenrolled quiz submit on DRAFT lesson => 404 (publication hides it)", submitDeny.status === 404, `status=${submitDeny.status}`);
 
     // 9. topic filter returns exactly the topic's lessons (an ignoring-filter API would return more)
     const globalMatching = uAllList.filter((l) => (l.topic ? l.topic._id || l.topic : "").toString() === TOPIC_HTML);

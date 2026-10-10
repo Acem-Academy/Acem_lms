@@ -23,6 +23,12 @@ const {
     assertLessonReadAccess,
 } = require("../utils/ownership");
 
+const {
+    isStudent,
+    getPublishedTopicIds,
+    isLessonPublishedForStudent,
+} = require("../utils/curriculumVisibility");
+
 /*
 |--------------------------------------------------------------------------
 | YouTube Helpers
@@ -613,7 +619,21 @@ const getLessons = async (topicId, user) => {
     | Students: full lesson data only for courses they are
     | enrolled in. Everyone else gets syllabus metadata, and
     | only for published lessons.
+    |
+    | A lesson is only visible to a student when the lesson is
+    | published AND its topic (and the whole ancestor chain) is
+    | published: a published lesson under a draft chapter must
+    | not leak.
     */
+
+    const publishedTopicIds =
+        await getPublishedTopicIds(
+            lessons.map((lesson) =>
+                lesson.topic
+                    ? lesson.topic._id || lesson.topic
+                    : null
+            )
+        );
 
     const topicCourseMap =
         await resolveTopicCourseMap(lessons);
@@ -627,9 +647,16 @@ const getLessons = async (topicId, user) => {
             ? (lesson.topic._id || lesson.topic).toString()
             : null;
 
-        const courseId = topicKey
-            ? topicCourseMap.get(topicKey)
-            : null;
+        const isVisible =
+            topicKey &&
+            lesson.status === LESSON_STATUS.PUBLISHED &&
+            publishedTopicIds.has(topicKey);
+
+        if (!isVisible) {
+            return result;
+        }
+
+        const courseId = topicCourseMap.get(topicKey);
 
         const hasAccess =
             courseId !== null &&
@@ -643,9 +670,7 @@ const getLessons = async (topicId, user) => {
             return result;
         }
 
-        if (lesson.status === LESSON_STATUS.PUBLISHED) {
-            result.push(shapeLessonSyllabus(lesson));
-        }
+        result.push(shapeLessonSyllabus(lesson));
 
         return result;
     }, []);
@@ -667,6 +692,21 @@ const getLessonById = async (lessonId, user) => {
     );
 
     if (!lesson) {
+        throw new ApiError(
+            404,
+            "Lesson not found."
+        );
+    }
+
+    /*
+    | Students must not reach a lesson that is unpublished or that sits
+    | under an unpublished ancestor, even with a direct lesson id.
+    */
+
+    if (
+        isStudent(user) &&
+        !(await isLessonPublishedForStudent(lesson))
+    ) {
         throw new ApiError(
             404,
             "Lesson not found."
@@ -703,6 +743,21 @@ const submitQuiz = async (
     });
 
     if (!lesson) {
+        throw new ApiError(
+            404,
+            "Lesson not found."
+        );
+    }
+
+    /*
+    | Students must not submit a quiz for a lesson that is unpublished
+    | or that sits under an unpublished ancestor.
+    */
+
+    if (
+        isStudent(user) &&
+        !(await isLessonPublishedForStudent(lesson))
+    ) {
         throw new ApiError(
             404,
             "Lesson not found."

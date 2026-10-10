@@ -1246,9 +1246,9 @@ function LessonEditor() {
     const handleSubmit = async (event) => {
         event.preventDefault();
 
-        if (!formData.title.trim()) {
+        if (formData.title.trim().length < 3) {
             setError(
-                "Lesson title is required."
+                "Lesson title must be at least 3 characters."
             );
             return;
         }
@@ -1561,7 +1561,7 @@ function LessonEditor() {
 
     if (loading) {
         return (
-            <div className="p-6">
+            <div className="min-h-full bg-slate-50 p-6">
                 <div className="flex min-h-[500px] items-center justify-center">
                     <div className="flex items-center gap-3 text-slate-500">
 
@@ -1588,7 +1588,7 @@ function LessonEditor() {
     */
 
     return (
-        <div className="p-6">
+        <div className="min-h-full bg-slate-50 p-6">
 
             {/* Header */}
 

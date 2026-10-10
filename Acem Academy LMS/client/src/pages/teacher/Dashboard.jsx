@@ -14,6 +14,13 @@ import { Link } from "react-router-dom";
 
 import { ROUTES } from "@/config/routes";
 import { getMyCourses } from "@/api/teacher.api";
+import { getTeacherStudents } from "@/api/enrollment.api";
+import {
+    getSubCourses,
+    getChapters,
+    getTopics,
+    getLessons,
+} from "@/api/curriculum.api";
 
 
 const TeacherDashboard = () => {
@@ -21,6 +28,8 @@ const TeacherDashboard = () => {
     const [courses, setCourses] = useState([]);
     const [loadingCourses, setLoadingCourses] = useState(true);
     const [coursesError, setCoursesError] = useState("");
+    const [totalStudents, setTotalStudents] = useState(null);
+    const [totalLessons, setTotalLessons] = useState(null);
 
 
     /* ========================================================= */
@@ -65,6 +74,106 @@ const TeacherDashboard = () => {
 
 
     /* ========================================================= */
+    /* Fetch Teacher Statistics */
+    /* ========================================================= */
+
+    useEffect(() => {
+
+        if (loadingCourses) {
+            return;
+        }
+
+        const courseIds = new Set(
+            courses.map((course) => course._id.toString())
+        );
+
+        const resolveId = (value) =>
+            value && (value._id || value).toString();
+
+        const fetchStats = async () => {
+
+            try {
+
+                const [
+                    studentsResponse,
+                    subCoursesResponse,
+                    chaptersResponse,
+                    topicsResponse,
+                    lessonsResponse,
+                ] = await Promise.all([
+                    getTeacherStudents(),
+                    getSubCourses(),
+                    getChapters(),
+                    getTopics(),
+                    getLessons(),
+                ]);
+
+                setTotalStudents(
+                    (studentsResponse.data || []).length
+                );
+
+                const subCourseIds = new Set(
+                    (subCoursesResponse.data || [])
+                        .filter((subCourse) =>
+                            courseIds.has(
+                                resolveId(subCourse.course)
+                            )
+                        )
+                        .map((subCourse) =>
+                            subCourse._id.toString()
+                        )
+                );
+
+                const chapterIds = new Set(
+                    (chaptersResponse.data || [])
+                        .filter((chapter) =>
+                            subCourseIds.has(
+                                resolveId(chapter.subCourse)
+                            )
+                        )
+                        .map((chapter) =>
+                            chapter._id.toString()
+                        )
+                );
+
+                const topicIds = new Set(
+                    (topicsResponse.data || [])
+                        .filter((topic) =>
+                            chapterIds.has(
+                                resolveId(topic.chapter)
+                            )
+                        )
+                        .map((topic) =>
+                            topic._id.toString()
+                        )
+                );
+
+                setTotalLessons(
+                    (lessonsResponse.data || []).filter(
+                        (lesson) =>
+                            topicIds.has(
+                                resolveId(lesson.topic)
+                            )
+                    ).length
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "Failed to fetch teacher statistics:",
+                    error
+                );
+
+            }
+
+        };
+
+        fetchStats();
+
+    }, [courses, loadingCourses]);
+
+
+    /* ========================================================= */
     /* Statistics */
     /* ========================================================= */
 
@@ -90,13 +199,13 @@ const TeacherDashboard = () => {
         },
         {
             title: "Total Students",
-            value: "0",
+            value: totalStudents ?? 0,
             description: "Students enrolled",
             icon: Users,
         },
         {
             title: "Total Lessons",
-            value: "0",
+            value: totalLessons ?? 0,
             description: "Lessons across your courses",
             icon: FileText,
         },
@@ -728,7 +837,7 @@ const TeacherDashboard = () => {
                                                 {/* Action */}
 
                                                 <Link
-                                                    to={ROUTES.TEACHER.COURSES}
+                                                    to={`/teacher/courses/${course._id}`}
                                                     className="
                                                         inline-flex
                                                         shrink-0

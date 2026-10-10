@@ -29,6 +29,7 @@ import StudentProfile from "@/pages/student/Profile";
 import MaterialViewer from "@/pages/student/MaterialViewer";
 
 import NotFound from "@/pages/common/NotFound";
+import Unauthorized from "@/pages/common/Unauthorized";
 
 import ProtectedRoute from "@/routes/ProtectedRoute";
 import PublicRoute from "@/routes/PublicRoute";
@@ -166,11 +167,6 @@ function AppRoutes() {
     element={<LessonEditor />}
 />
 
-<Route
-    path="courses/:courseId/lessons/:lessonId/edit"
-    element={<LessonEditor />}
-/>
-
  <Route
         path="/teacher/students"
         element={<GetStudents />}
@@ -254,6 +250,18 @@ function AppRoutes() {
           
 
         </Route>
+
+
+        {/* ====================================================== */}
+        {/* 403 Unauthorized */}
+        {/* ====================================================== */}
+
+        <Route
+          path={ROUTES.UNAUTHORIZED}
+          element={
+            <Unauthorized />
+          }
+        />
 
 
         {/* ====================================================== */}

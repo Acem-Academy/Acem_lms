@@ -15,7 +15,7 @@ function ProtectedRoute({ children, roles = [] }) {
   }
 
   if (roles.length > 0 && !roles.includes(user.role)) {
-    return <Navigate to="/unauthorized" replace />;
+    return <Navigate to={ROUTES.UNAUTHORIZED} replace />;
   }
 
   return children;

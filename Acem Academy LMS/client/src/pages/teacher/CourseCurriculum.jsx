@@ -20,18 +20,69 @@ import {
   createSubCourse,
   updateSubCourse,
   deleteSubCourse,
+  updateSubCourseStatus,
   getChapters,
   createChapter,
   updateChapter,
   deleteChapter,
+  updateChapterStatus,
   getTopics,
   createTopic,
   updateTopic,
   deleteTopic,
+  updateTopicStatus,
   getLessons,
   updateLesson,
   deleteLesson,
+  updateLessonStatus,
 } from "@/api/curriculum.api";
+
+
+function StatusControl({ status, isUpdating, onToggle }) {
+  const isPublished = status === "published";
+  const label = status
+    ? status.charAt(0).toUpperCase() + status.slice(1)
+    : "Draft";
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span
+        className={`
+          rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase
+          tracking-wide
+          ${
+            isPublished
+              ? "bg-green-100 text-green-700"
+              : "bg-amber-100 text-amber-700"
+          }
+        `}
+      >
+        {label}
+      </span>
+
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={isUpdating}
+        title={isPublished ? "Move to draft" : "Publish"}
+        className="
+          inline-flex items-center gap-1 rounded-lg border border-slate-200
+          bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700
+          shadow-sm transition hover:border-slate-300 hover:bg-slate-50
+          disabled:opacity-50
+        "
+      >
+        {isUpdating ? (
+          <Loader2 size={13} className="animate-spin" />
+        ) : isPublished ? (
+          "Unpublish"
+        ) : (
+          "Publish"
+        )}
+      </button>
+    </div>
+  );
+}
 
 
 function CourseCurriculum() {
@@ -66,6 +117,7 @@ function CourseCurriculum() {
 
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState(null);
 
 
   /*
@@ -329,7 +381,8 @@ function CourseCurriculum() {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!formData.title.trim()) {
+    if (formData.title.trim().length < 3) {
+      setError("Title must be at least 3 characters.");
       return;
     }
 
@@ -514,6 +567,59 @@ function CourseCurriculum() {
 
   /*
   |--------------------------------------------------------------------------
+  | Publish / Draft
+  |--------------------------------------------------------------------------
+  */
+
+  const handleStatusChange = async (type, item) => {
+    if (statusUpdatingId) return;
+
+    const nextStatus =
+      item.status === "published"
+        ? "draft"
+        : "published";
+
+    try {
+      setStatusUpdatingId(item._id);
+      setError("");
+
+      if (type === "subCourse") {
+        await updateSubCourseStatus(item._id, nextStatus);
+      }
+
+      if (type === "chapter") {
+        await updateChapterStatus(item._id, nextStatus);
+      }
+
+      if (type === "topic") {
+        await updateTopicStatus(item._id, nextStatus);
+      }
+
+      if (type === "lesson") {
+        await updateLessonStatus(item._id, nextStatus);
+      }
+
+      await fetchCurriculum();
+
+    } catch (err) {
+      console.error(
+        "Failed to update curriculum status:",
+        err
+      );
+
+      setError(
+        err?.response?.data?.message ||
+        "Unable to update curriculum status."
+      );
+
+    } finally {
+      setStatusUpdatingId(null);
+    }
+  };
+
+
+  /*
+  |--------------------------------------------------------------------------
   | Labels
   |--------------------------------------------------------------------------
   */
@@ -545,7 +651,7 @@ function CourseCurriculum() {
 
   if (loading) {
     return (
-      <div className="p-6">
+      <div className="min-h-full bg-slate-50 p-6">
 
         <div className="flex min-h-[500px] items-center justify-center">
 
@@ -608,7 +714,7 @@ function CourseCurriculum() {
   }
 
   return (
-    <div className="min-h-full p-4 sm:p-6 lg:p-8">
+    <div className="min-h-full bg-slate-50 p-4 sm:p-6 lg:p-8">
       {/* Page Header */}
       <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3 sm:items-center sm:gap-4">
@@ -925,6 +1031,14 @@ function CourseCurriculum() {
                       </div>
 
                       <div className="flex items-center justify-end gap-1.5 sm:gap-2">
+                        <StatusControl
+                          status={subCourse.status}
+                          isUpdating={statusUpdatingId === subCourseId}
+                          onToggle={() =>
+                            handleStatusChange("subCourse", subCourse)
+                          }
+                        />
+
                         <button
                           type="button"
                           onClick={() =>
@@ -1080,6 +1194,14 @@ function CourseCurriculum() {
                                     </div>
 
                                     <div className="flex items-center justify-end gap-1">
+                                      <StatusControl
+                                        status={chapter.status}
+                                        isUpdating={statusUpdatingId === chapterId}
+                                        onToggle={() =>
+                                          handleStatusChange("chapter", chapter)
+                                        }
+                                      />
+
                                       <button
                                         type="button"
                                         onClick={() =>
@@ -1244,6 +1366,14 @@ function CourseCurriculum() {
                                                     </div>
 
                                                     <div className="flex items-center justify-end gap-1">
+                                                      <StatusControl
+                                                        status={topic.status}
+                                                        isUpdating={statusUpdatingId === topicId}
+                                                        onToggle={() =>
+                                                          handleStatusChange("topic", topic)
+                                                        }
+                                                      />
+
                                                       <button
                                                         type="button"
                                                         onClick={() => handleAddLesson(topicId)}
@@ -1375,6 +1505,14 @@ function CourseCurriculum() {
                                                                 </div>
 
                                                                 <div className="flex items-center justify-end gap-1">
+                                                                  <StatusControl
+                                                                    status={lesson.status}
+                                                                    isUpdating={statusUpdatingId === lesson._id}
+                                                                    onToggle={() =>
+                                                                      handleStatusChange("lesson", lesson)
+                                                                    }
+                                                                  />
+
                                                                   <button
                                                                     type="button"
                                                                     onClick={() =>

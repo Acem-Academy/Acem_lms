@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "test:regression": "node tests/regression/run.js",
     "test:h10": "node tests/regression/run.js h10",
-    "test:day4": "node tests/regression/run.js day4"
+    "test:day4": "node tests/regression/run.js day4",
+    "test:visibility": "node tests/regression/run.js visibility"
   },
   "keywords": [],
   "author": "",

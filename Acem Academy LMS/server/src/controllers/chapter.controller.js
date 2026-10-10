@@ -35,7 +35,8 @@ const createChapter = asyncHandler(async (req, res) => {
 const getChapters = asyncHandler(async (req, res) => {
 
     const chapters = await chapterService.getChapters(
-        req.query.subCourse
+        req.query.subCourse,
+        req.user
     );
 
     return res.status(200).json(

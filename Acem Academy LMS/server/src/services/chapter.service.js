@@ -11,6 +11,11 @@ const {
     CHAPTER_STATUS,
 } = require("../constants/chapter.constants");
 
+const {
+    isStudent,
+    getPublishedChapterIds,
+} = require("../utils/curriculumVisibility");
+
 const CHAPTER_UPDATE_FIELDS = [
     "title",
     "description",
@@ -89,7 +94,7 @@ const createChapter = async (
 |--------------------------------------------------------------------------
 */
 
-const getChapters = async (subCourseId) => {
+const getChapters = async (subCourseId, user) => {
 
     const filter = {
         isDeleted: false,
@@ -108,7 +113,32 @@ const getChapters = async (subCourseId) => {
             position: 1,
         });
 
-    return chapters;
+    /*
+    |--------------------------------------------------------------------------
+    | Student Visibility
+    |--------------------------------------------------------------------------
+    |
+    | Students only see published chapters whose sub-course and course are
+    | published. Teachers/admins keep the full list (drafts included).
+    |
+    */
+
+    if (!isStudent(user)) {
+        return chapters;
+    }
+
+    const publishedChapterIds =
+        await getPublishedChapterIds(
+            chapters.map(
+                (chapter) => chapter._id
+            )
+        );
+
+    return chapters.filter((chapter) =>
+        publishedChapterIds.has(
+            chapter._id.toString()
+        )
+    );
 
 };
 /*
@@ -135,6 +165,24 @@ const getChapterById = async (
             404,
             "Chapter not found."
         );
+    }
+
+    if (isStudent(user)) {
+        const publishedChapterIds =
+            await getPublishedChapterIds([
+                chapterId,
+            ]);
+
+        if (
+            !publishedChapterIds.has(
+                chapterId.toString()
+            )
+        ) {
+            throw new ApiError(
+                404,
+                "Chapter not found."
+            );
+        }
     }
 
     await assertCurriculumOwnership(

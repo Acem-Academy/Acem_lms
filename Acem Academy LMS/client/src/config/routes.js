@@ -3,6 +3,7 @@ export const ROUTES = {
   HOME: "/",
   LOGIN: "/login",
   REGISTER: "/register",
+  UNAUTHORIZED: "/unauthorized",
 
   // Admin
   ADMIN: {

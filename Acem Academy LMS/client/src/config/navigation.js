@@ -48,7 +48,7 @@ export const NAVIGATION = {
     {
       title: "My Courses",
       icon: BookOpen,
-      path: ROUTES.STUDENT.MY_COURSES,
+      path: ROUTES.STUDENT.MY_LEARNING,
     },
     {
       title: "Profile",

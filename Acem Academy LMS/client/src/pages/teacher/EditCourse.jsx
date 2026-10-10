@@ -169,6 +169,20 @@ const EditCourse = () => {
             setError("");
             setSuccess("");
 
+            if (formData.title.trim().length < 3) {
+                setError(
+                    "Course title must be at least 3 characters."
+                );
+                return;
+            }
+
+            if (formData.description.trim().length < 10) {
+                setError(
+                    "Course description must be at least 10 characters."
+                );
+                return;
+            }
+
             const payload = new FormData();
 
             payload.append(

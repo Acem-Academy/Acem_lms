@@ -15,6 +15,11 @@ const {
     SUBCOURSE_STATUS,
 } = require("../constants/subCourse.constants");
 
+const {
+    isStudent,
+    getPublishedSubCourseIds,
+} = require("../utils/curriculumVisibility");
+
 const SUBCOURSE_UPDATE_FIELDS = [
     "title",
     "description",
@@ -143,7 +148,7 @@ const createSubCourse = async (
 |--------------------------------------------------------------------------
 */
 
-const getSubCourses = async (courseId) => {
+const getSubCourses = async (courseId, user) => {
 
     const filter = {
         isDeleted: false,
@@ -162,7 +167,32 @@ const getSubCourses = async (courseId) => {
             position: 1,
         });
 
-    return subCourses;
+    /*
+    |--------------------------------------------------------------------------
+    | Student Visibility
+    |--------------------------------------------------------------------------
+    |
+    | Students only see published sub-courses whose course is published.
+    | Teachers/admins keep the full list (drafts included).
+    |
+    */
+
+    if (!isStudent(user)) {
+        return subCourses;
+    }
+
+    const publishedSubCourseIds =
+        await getPublishedSubCourseIds(
+            subCourses.map(
+                (subCourse) => subCourse._id
+            )
+        );
+
+    return subCourses.filter((subCourse) =>
+        publishedSubCourseIds.has(
+            subCourse._id.toString()
+        )
+    );
 
 };
 
@@ -190,6 +220,24 @@ const getSubCourseById = async (
             404,
             "Sub Course not found."
         );
+    }
+
+    if (isStudent(user)) {
+        const publishedSubCourseIds =
+            await getPublishedSubCourseIds([
+                subCourseId,
+            ]);
+
+        if (
+            !publishedSubCourseIds.has(
+                subCourseId.toString()
+            )
+        ) {
+            throw new ApiError(
+                404,
+                "Sub Course not found."
+            );
+        }
     }
 
     await assertCurriculumOwnership(

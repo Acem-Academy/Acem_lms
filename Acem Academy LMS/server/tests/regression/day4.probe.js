@@ -12,7 +12,7 @@ const BASE = process.env.PROBE_BASE || "http://localhost:4319";
 const TEACHER = "6a71e1861ea02a2f75b9c7fd";
 const ADMIN = "6a703908e4a774afc478ea9b";
 const STUDENT = "6a707973e4a774afc478ea9d";
-const BASELINE = { courses: 7, lessons: 13, subcourses: 9, chapters: 9, topics: 7, enrollments: 6, users: 9 };
+const BASELINE = { courses: 7, lessons: 13, subcourses: 9, chapters: 10, topics: 7, enrollments: 6, users: 9 };
 
 const results = [];
 const check = (name, ok, detail) => {

@@ -273,10 +273,10 @@ const { logout } = useAuth();
         clearMessages();
 
 
-        if (!profileForm.fullName.trim()) {
+        if (profileForm.fullName.trim().length < 3) {
 
             setErrorMessage(
-                "Full name is required."
+                "Full name must be at least 3 characters."
             );
 
             return;

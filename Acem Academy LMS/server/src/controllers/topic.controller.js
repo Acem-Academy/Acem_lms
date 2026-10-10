@@ -35,7 +35,8 @@ const createTopic = asyncHandler(async (req, res) => {
 const getTopics = asyncHandler(async (req, res) => {
 
     const topics = await topicService.getTopics(
-        req.query.chapter
+        req.query.chapter,
+        req.user
     );
 
     return res.status(200).json(

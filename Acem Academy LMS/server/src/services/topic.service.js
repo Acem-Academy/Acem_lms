@@ -11,6 +11,11 @@ const {
     TOPIC_STATUS,
 } = require("../constants/topic.constants");
 
+const {
+    isStudent,
+    getPublishedTopicIds,
+} = require("../utils/curriculumVisibility");
+
 const TOPIC_UPDATE_FIELDS = [
     "title",
     "description",
@@ -114,7 +119,7 @@ const createTopic = async (
 |--------------------------------------------------------------------------
 */
 
-const getTopics = async (chapterId) => {
+const getTopics = async (chapterId, user) => {
 
     const filter = {
         isDeleted: false,
@@ -133,7 +138,32 @@ const getTopics = async (chapterId) => {
             position: 1,
         });
 
-    return topics;
+    /*
+    |--------------------------------------------------------------------------
+    | Student Visibility
+    |--------------------------------------------------------------------------
+    |
+    | Students only see published topics whose chapter, sub-course and
+    | course are published. Teachers/admins keep the full list.
+    |
+    */
+
+    if (!isStudent(user)) {
+        return topics;
+    }
+
+    const publishedTopicIds =
+        await getPublishedTopicIds(
+            topics.map(
+                (topic) => topic._id
+            )
+        );
+
+    return topics.filter((topic) =>
+        publishedTopicIds.has(
+            topic._id.toString()
+        )
+    );
 
 };
 
@@ -161,6 +191,24 @@ const getTopicById = async (
             404,
             "Topic not found."
         );
+    }
+
+    if (isStudent(user)) {
+        const publishedTopicIds =
+            await getPublishedTopicIds([
+                topicId,
+            ]);
+
+        if (
+            !publishedTopicIds.has(
+                topicId.toString()
+            )
+        ) {
+            throw new ApiError(
+                404,
+                "Topic not found."
+            );
+        }
     }
 
     await assertCurriculumOwnership(

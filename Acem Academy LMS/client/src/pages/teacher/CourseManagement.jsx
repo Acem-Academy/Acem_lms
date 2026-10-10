@@ -17,6 +17,7 @@ const [error, setError] = useState("");
 const [success, setSuccess] = useState("");
 const [statusLoading, setStatusLoading] = useState(false);
 const [deleteLoading, setDeleteLoading] = useState(false);
+const [actionError, setActionError] = useState("");
 
     useEffect(() => {
 
@@ -62,7 +63,7 @@ const [deleteLoading, setDeleteLoading] = useState(false);
     try {
 
         setStatusLoading(true);
-        setError("");
+        setActionError("");
         setSuccess("");
 
         const newStatus =
@@ -90,7 +91,7 @@ const [deleteLoading, setDeleteLoading] = useState(false);
             error
         );
 
-        setError(
+        setActionError(
             error?.response?.data?.message ||
             "Unable to update course status."
         );
@@ -117,7 +118,7 @@ const [deleteLoading, setDeleteLoading] = useState(false);
         try {
 
             setDeleteLoading(true);
-            setError("");
+            setActionError("");
             setSuccess("");
 
             await deleteCourse(courseId);
@@ -131,7 +132,7 @@ const [deleteLoading, setDeleteLoading] = useState(false);
                 error
             );
 
-            setError(
+            setActionError(
                 error?.response?.data?.message ||
                 "Unable to delete course."
             );
@@ -276,6 +277,21 @@ const [deleteLoading, setDeleteLoading] = useState(false);
 
                         <p className="text-sm text-green-400">
                             {success}
+                        </p>
+
+                    </div>
+                )}
+
+
+                {/* ================================================= */}
+                {/* Action Error */}
+                {/* ================================================= */}
+
+                {actionError && (
+                    <div className="mt-6 rounded-2xl border border-red-900 bg-red-950/30 p-6">
+
+                        <p className="text-sm text-red-400">
+                            {actionError}
                         </p>
 
                     </div>
