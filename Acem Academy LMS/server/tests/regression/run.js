@@ -31,7 +31,8 @@ const LOG_PATH = path.join(os.tmpdir(), `acem-test-server-${PORT}.log`);
 const SUITES = {
     h10: { file: "h10.probe.js", assertions: 28, label: "H10 - Lesson List Access" },
     day4: { file: "day4.probe.js", assertions: 83, label: "Day 4 - Teacher Core Flows" },
-    visibility: { file: "visibility.probe.js", assertions: 31, label: "Student Curriculum Visibility" },
+    visibility: { file: "visibility.probe.js", assertions: 37, label: "Student Curriculum Visibility" },
+    learning: { file: "learning.probe.js", assertions: 32, label: "Day 5 - Student Learning Progress" },
 };
 
 let server = null;

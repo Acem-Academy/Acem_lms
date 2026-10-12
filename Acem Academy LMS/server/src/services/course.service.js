@@ -86,11 +86,27 @@ const createCourse = async (courseData, file, user) => {
 /*                               Get Courses                                  */
 /* -------------------------------------------------------------------------- */
 
-const getCourses = async () => {
+const getCourses = async (user) => {
 
-    return await Course.find({
+    const filter = {
         isDeleted: false,
-    })
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | Students only see published courses
+    |--------------------------------------------------------------------------
+    |
+    | Teachers/admins still see every non-deleted course (including drafts
+    | and archived) so they can manage their own content.
+    |
+    */
+
+    if (user && user.role === ROLES.STUDENT) {
+        filter.status = COURSE_STATUS.PUBLISHED;
+    }
+
+    return await Course.find(filter)
         .populate("teacher", "fullName email")
         .sort({ createdAt: -1 });
 
@@ -115,7 +131,7 @@ const getMyCourses = async (teacherId) => {
 /*                             Get Course By Id                               */
 /* -------------------------------------------------------------------------- */
 
-const getCourseById = async (courseId) => {
+const getCourseById = async (courseId, user) => {
 
     const course = await Course.findOne({
         _id: courseId,
@@ -124,6 +140,27 @@ const getCourseById = async (courseId) => {
         .populate("teacher", "fullName email");
 
     if (!course) {
+        throw new ApiError(
+            404,
+            "Course not found"
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Students cannot access unpublished courses
+    |--------------------------------------------------------------------------
+    |
+    | Draft/archived courses are hidden from students, matching the
+    | curriculum-level visibility rules.
+    |
+    */
+
+    if (
+        user &&
+        user.role === ROLES.STUDENT &&
+        course.status !== COURSE_STATUS.PUBLISHED
+    ) {
         throw new ApiError(
             404,
             "Course not found"

@@ -17,7 +17,7 @@ const createCourse = asyncHandler(async (req, res) => {
 
 const getCourses = asyncHandler(async (req, res) => {
 
-    const courses = await courseService.getCourses(req.query);
+    const courses = await courseService.getCourses(req.user);
 
     return res.status(200).json(
         new ApiResponse(
@@ -49,7 +49,8 @@ const getMyCourses = asyncHandler(async (req, res) => {
 const getCourseById = asyncHandler(async (req, res) => {
 
     const course = await courseService.getCourseById(
-        req.params.courseId
+        req.params.courseId,
+        req.user
     );
 
     return res.status(200).json(

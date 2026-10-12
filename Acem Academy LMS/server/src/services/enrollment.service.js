@@ -84,9 +84,25 @@ if (existingEnrollment) {
     // Student cancelled earlier, allow re-enrollment
     if (existingEnrollment.status === ENROLLMENT_STATUS.CANCELLED) {
 
+        /*
+        |----------------------------------------------------------------------
+        | Restart The Course
+        |----------------------------------------------------------------------
+        |
+        | Re-enrollment is an explicit restart (this branch already resets
+        | enrolledAt/completedAt), so the previous attempt's progress must be
+        | cleared as well; otherwise the current curriculum would immediately
+        | re-derive 100% and the cancelled course would unexpectedly reopen
+        | as completed. This is the only flow that resets completion state.
+        |
+        */
+
         existingEnrollment.status = ENROLLMENT_STATUS.ACTIVE;
         existingEnrollment.enrolledAt = new Date();
         existingEnrollment.completedAt = null;
+        existingEnrollment.progress = 0;
+        existingEnrollment.completedLessons = [];
+        existingEnrollment.lastAccessedLesson = null;
         existingEnrollment.updatedBy = user._id;
 
         await existingEnrollment.save();
@@ -149,14 +165,45 @@ const getMyCourses = async (user) => {
             createdAt: -1,
         });
 
+    /*
+    |--------------------------------------------------------------------------
+    | Re-derive Progress For Each Enrollment
+    |--------------------------------------------------------------------------
+    |
+    | The curriculum may have changed (lessons added, published, removed)
+    | since the last visit, so refresh the stored progress against the
+    | current published lessons before returning it.
+    |
+    */
+
+    for (const enrollment of enrollments) {
+
+        const courseId = courseIdOf(enrollment);
+
+        if (!courseId) {
+            continue;
+        }
+
+        const snapshotUpdatedAt = enrollment.updatedAt;
+
+        const publishedLessonIds =
+            await getPublishedLessonIdsForCourse(courseId);
+
+        if (
+            syncEnrollmentProgress(
+                enrollment,
+                publishedLessonIds
+            )
+        ) {
+            await persistEnrollmentSync(
+                enrollment,
+                snapshotUpdatedAt
+            );
+        }
+    }
+
     return enrollments;
 };
-
-/*
-|--------------------------------------------------------------------------
-| Get Enrollment By Id
-|--------------------------------------------------------------------------
-*/
 
 /*
 |--------------------------------------------------------------------------
@@ -189,6 +236,34 @@ const getEnrollmentById = async (
             403,
             "You are not authorized to access this enrollment."
         );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Re-derive Progress Against The Current Published Curriculum
+    |--------------------------------------------------------------------------
+    */
+
+    const courseId = courseIdOf(enrollment);
+
+    if (courseId) {
+
+        const snapshotUpdatedAt = enrollment.updatedAt;
+
+        const publishedLessonIds =
+            await getPublishedLessonIdsForCourse(courseId);
+
+        if (
+            syncEnrollmentProgress(
+                enrollment,
+                publishedLessonIds
+            )
+        ) {
+            await persistEnrollmentSync(
+                enrollment,
+                snapshotUpdatedAt
+            );
+        }
     }
 
     return enrollment;
@@ -275,6 +350,190 @@ const cancelEnrollment = async (
 
 /*
 |--------------------------------------------------------------------------
+| Progress Helpers
+|--------------------------------------------------------------------------
+|
+| Enrollment progress is always derived from the CURRENT published
+| curriculum, never trusted from a stale stored value: adding, publishing,
+| unpublishing or removing lessons changes the denominator, so a course may
+| need to be reopened or re-completed. Historical completedLessons entries
+| are preserved untouched (nothing is ever deleted from history).
+|
+*/
+
+const courseIdOf = (enrollment) =>
+    enrollment.course && enrollment.course._id
+        ? enrollment.course._id
+        : enrollment.course;
+
+const getPublishedLessonIdsForCourse = async (courseId) => {
+
+    const subCourses = await SubCourse.find({
+        course: courseId,
+        isDeleted: false,
+    }).select("_id");
+
+    const chapters = await Chapter.find({
+        subCourse: {
+            $in: subCourses.map(
+                (subCourse) => subCourse._id
+            ),
+        },
+        isDeleted: false,
+    }).select("_id");
+
+    const topics = await Topic.find({
+        chapter: {
+            $in: chapters.map(
+                (chapter) => chapter._id
+            ),
+        },
+        isDeleted: false,
+    }).select("_id");
+
+    const lessons = await Lesson.find({
+        topic: {
+            $in: topics.map(
+                (topic) => topic._id
+            ),
+        },
+        status: LESSON_STATUS.PUBLISHED,
+        isDeleted: false,
+    }).select("_id");
+
+    return lessons.map(
+        (lesson) => lesson._id.toString()
+    );
+};
+
+/*
+|--------------------------------------------------------------------------
+| Sync Enrollment Progress + Status
+|--------------------------------------------------------------------------
+|
+| Mutates the enrollment in memory and reports whether anything changed so
+| callers can avoid needless writes. Only completed lessons that are still
+| part of the published curriculum count.
+|
+*/
+
+const syncEnrollmentProgress = (
+    enrollment,
+    publishedLessonIds
+) => {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cancelled / Suspended Enrollments Are Frozen
+    |--------------------------------------------------------------------------
+    |
+    | These statuses are terminal/managed outside the learning flow, so their
+    | progress and completion metadata must not be re-derived. Touching them
+    | could leave a row with e.g. progress < 100 while completedAt is still
+    | set (inconsistent status/completion metadata), so leave them untouched.
+    |
+    */
+
+    if (
+        enrollment.status === ENROLLMENT_STATUS.CANCELLED ||
+        enrollment.status === ENROLLMENT_STATUS.SUSPENDED
+    ) {
+        return false;
+    }
+
+    const publishedSet =
+        publishedLessonIds instanceof Set
+            ? publishedLessonIds
+            : new Set(publishedLessonIds);
+
+    const totalLessons = publishedSet.size;
+
+    const completedLessons =
+        enrollment.completedLessons.filter(
+            (completedLesson) =>
+                publishedSet.has(
+                    completedLesson.toString()
+                )
+        ).length;
+
+    const progress =
+        totalLessons === 0
+            ? 0
+            : Math.round(
+                (completedLessons / totalLessons) * 100
+            );
+
+    const previousProgress = enrollment.progress;
+    const previousStatus = enrollment.status;
+    const previousCompletedAt = enrollment.completedAt
+        ? enrollment.completedAt.getTime()
+        : null;
+
+    enrollment.progress = progress;
+
+    if (progress >= 100) {
+        enrollment.status = ENROLLMENT_STATUS.COMPLETED;
+        if (!enrollment.completedAt) {
+            enrollment.completedAt = new Date();
+        }
+    } else {
+        enrollment.status = ENROLLMENT_STATUS.ACTIVE;
+        enrollment.completedAt = null;
+    }
+
+    const nextCompletedAt = enrollment.completedAt
+        ? enrollment.completedAt.getTime()
+        : null;
+
+    return (
+        enrollment.progress !== previousProgress ||
+        enrollment.status !== previousStatus ||
+        nextCompletedAt !== previousCompletedAt
+    );
+};
+
+/*
+|--------------------------------------------------------------------------
+| Persist Synced Progress (Concurrency-Safe)
+|--------------------------------------------------------------------------
+|
+| Read paths re-derive progress from a snapshot and write it back. A plain
+| save() would let a snapshot taken before a concurrent completeLesson/start
+| overwrite that newer write (lost update), reverting a just-finished lesson.
+| Guard the write on the row's updatedAt so it only applies when the row has
+| not changed since it was read. Returns whether the write was applied.
+|
+*/
+
+const persistEnrollmentSync = async (
+    enrollment,
+    snapshotUpdatedAt
+) => {
+
+    const filter = {
+        _id: enrollment._id,
+    };
+
+    if (snapshotUpdatedAt) {
+        filter.updatedAt = snapshotUpdatedAt;
+    }
+
+    const result = await Enrollment.updateOne(
+        filter,
+        {
+            $set: {
+                progress: enrollment.progress,
+                status: enrollment.status,
+                completedAt: enrollment.completedAt,
+            },
+        }
+    );
+
+    return result.matchedCount === 1;
+};
+
+/*
+|--------------------------------------------------------------------------
 | Start Lesson
 |--------------------------------------------------------------------------
 */
@@ -287,14 +546,19 @@ const startLesson = async (
 
     /*
     |--------------------------------------------------------------------------
-    | Find Active Enrollment
+    | Find Enrollment (active or previously completed)
     |--------------------------------------------------------------------------
     */
 
     const enrollment = await Enrollment.findOne({
         _id: enrollmentId,
         student: user._id,
-        status: ENROLLMENT_STATUS.ACTIVE,
+        status: {
+            $in: [
+                ENROLLMENT_STATUS.ACTIVE,
+                ENROLLMENT_STATUS.COMPLETED,
+            ],
+        },
     });
 
     if (!enrollment) {
@@ -395,6 +659,22 @@ const startLesson = async (
 
     /*
     |--------------------------------------------------------------------------
+    | Re-derive Progress Against The Current Published Curriculum
+    |--------------------------------------------------------------------------
+    */
+
+    const publishedLessonIds =
+        await getPublishedLessonIdsForCourse(
+            courseIdOf(enrollment)
+        );
+
+    syncEnrollmentProgress(
+        enrollment,
+        publishedLessonIds
+    );
+
+    /*
+    |--------------------------------------------------------------------------
     | Update Last Accessed Lesson
     |--------------------------------------------------------------------------
     */
@@ -432,7 +712,12 @@ const completeLesson = async (
     const enrollment = await Enrollment.findOne({
         _id: enrollmentId,
         student: user._id,
-        status: ENROLLMENT_STATUS.ACTIVE,
+        status: {
+            $in: [
+                ENROLLMENT_STATUS.ACTIVE,
+                ENROLLMENT_STATUS.COMPLETED,
+            ],
+        },
     });
 
     if (!enrollment) {
@@ -534,72 +819,27 @@ const completeLesson = async (
 
     /*
     |--------------------------------------------------------------------------
-    | Get Total Published Lessons In Course
+    | Re-derive Progress Against The Current Published Curriculum
     |--------------------------------------------------------------------------
+    |
+    | Only completed lessons that are still part of the current published
+    | curriculum count. Historical completions are preserved in
+    | completedLessons (never deleted), but lessons that were later
+    | unpublished/removed no longer count, so progress can never exceed
+    | 100% and course completion is not blocked. This also reopens a
+    | previously completed course when new lessons are published.
+    |
     */
 
-    const subCourses = await SubCourse.find({
-        course: enrollment.course,
-        isDeleted: false,
-    }).select("_id");
+    const publishedLessonIds =
+        await getPublishedLessonIdsForCourse(
+            courseIdOf(enrollment)
+        );
 
-    const subCourseIds = subCourses.map(
-        (subCourse) => subCourse._id
+    syncEnrollmentProgress(
+        enrollment,
+        publishedLessonIds
     );
-
-    const chapters = await Chapter.find({
-        subCourse: { $in: subCourseIds },
-        isDeleted: false,
-    }).select("_id");
-
-    const chapterIds = chapters.map(
-        (chapter) => chapter._id
-    );
-
-    const topics = await Topic.find({
-        chapter: { $in: chapterIds },
-        isDeleted: false,
-    }).select("_id");
-
-    const topicIds = topics.map(
-        (topic) => topic._id
-    );
-
-    const totalLessons = await Lesson.countDocuments({
-        topic: { $in: topicIds },
-        status: LESSON_STATUS.PUBLISHED,
-        isDeleted: false,
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Calculate Course Progress
-    |--------------------------------------------------------------------------
-    */
-
-    const completedLessons =
-        enrollment.completedLessons.length;
-
-    enrollment.progress =
-        totalLessons === 0
-            ? 0
-            : Math.round(
-                (completedLessons / totalLessons) * 100
-            );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Course Completed
-    |--------------------------------------------------------------------------
-    */
-
-    if (enrollment.progress === 100) {
-
-        enrollment.status =
-            ENROLLMENT_STATUS.COMPLETED;
-
-        enrollment.completedAt = new Date();
-    }
 
     enrollment.lastAccessedLesson = lesson._id;
     enrollment.updatedBy = user._id;
@@ -684,10 +924,52 @@ const getTeacherStudents = async (teacherId) => {
 
     const studentsMap = new Map();
 
+    /*
+    |--------------------------------------------------------------------------
+    | Refresh Progress Against The Current Published Curriculum
+    |--------------------------------------------------------------------------
+    |
+    | Progress is otherwise only synced when the student reads their own
+    | enrollment, so a teacher would see a stale value after the curriculum
+    | changes (e.g. a new lesson published). Re-derive per course, caching the
+    | published lesson ids so repeated courses in the same request are cheap.
+    |
+    */
+
+    const publishedByCourse = new Map();
+
     for (const enrollment of enrollments) {
 
         if (!enrollment.student) {
             continue;
+        }
+
+        const courseId = courseIdOf(enrollment);
+
+        if (courseId) {
+
+            const cacheKey = String(courseId);
+
+            if (!publishedByCourse.has(cacheKey)) {
+                publishedByCourse.set(
+                    cacheKey,
+                    await getPublishedLessonIdsForCourse(courseId)
+                );
+            }
+
+            const snapshotUpdatedAt = enrollment.updatedAt;
+
+            if (
+                syncEnrollmentProgress(
+                    enrollment,
+                    publishedByCourse.get(cacheKey)
+                )
+            ) {
+                await persistEnrollmentSync(
+                    enrollment,
+                    snapshotUpdatedAt
+                );
+            }
         }
 
         const studentId =
@@ -737,5 +1019,6 @@ module.exports = {
     startLesson,
     completeLesson,
     getTeacherStudents,
+    persistEnrollmentSync,
 };
 

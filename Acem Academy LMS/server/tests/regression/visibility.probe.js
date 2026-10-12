@@ -152,6 +152,7 @@ const purgeTempRecords = async (db) => {
     });
     created.enrollments.push(enr.insertedId.toString());
 
+    const C1s = C1._id.toString(), C2s = C2._id.toString();
     const S1s = S1._id.toString(), S2s = S2._id.toString(), S3s = S3._id.toString();
     const H1s = H1._id.toString(), H2s = H2._id.toString(), H3s = H3._id.toString();
     const T1s = T1._id.toString(), T2s = T2._id.toString(), T3s = T3._id.toString();
@@ -238,6 +239,20 @@ const purgeTempRecords = async (db) => {
 
     const studentCreate = await req("POST", "/sub-courses", { headers: ENROLLED_H, json: { course: C1._id.toString(), title: "CV Illegal Sub" } });
     check("G5 student cannot create curriculum => 403", studentCreate.status === 403, `status=${studentCreate.status}`);
+
+    /* ---- I. Course listing/detail honor publication for students ---- */
+    const sCourses = await req("GET", "/courses", { headers: ENROLLED_H });
+    check("I1 enrolled student GET /courses excludes draft course", sCourses.status === 200 && includesId(sCourses.data, C1s) && excludesId(sCourses.data, C2s), `status=${sCourses.status} n=${idsOf(sCourses.data).length}`);
+    const uCourses = await req("GET", "/courses", { headers: UNENROLLED_H });
+    check("I2 unenrolled student GET /courses excludes draft course", uCourses.status === 200 && excludesId(uCourses.data, C2s), `status=${uCourses.status} n=${idsOf(uCourses.data).length}`);
+    const sPubCourse = await req("GET", `/courses/${C1s}`, { headers: ENROLLED_H });
+    check("I3 student GET published course by id => 200", sPubCourse.status === 200, `status=${sPubCourse.status}`);
+    const sDraftCourse = await req("GET", `/courses/${C2s}`, { headers: ENROLLED_H });
+    check("I4 student GET draft course by id => 404", sDraftCourse.status === 404, `status=${sDraftCourse.status}`);
+    const tCourses = await req("GET", "/courses", { headers: TEACHER_H });
+    check("I5 teacher GET /courses still includes drafts", includesId(tCourses.data, C1s) && includesId(tCourses.data, C2s), `n=${idsOf(tCourses.data).length}`);
+    const tDraftCourse = await req("GET", `/courses/${C2s}`, { headers: TEACHER_H });
+    check("I6 teacher GET draft course by id => 200", tDraftCourse.status === 200, `status=${tDraftCourse.status}`);
 
     /* ---- H. Purge + restore baseline ---- */
     const purged = await purgeTempRecords(db);
