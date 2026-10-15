@@ -305,6 +305,37 @@ const normalizeLessonContent = (content) => {
     return "";
 };
 
+/*
+|--------------------------------------------------------------------------
+| Merge Refreshed Enrollment
+|--------------------------------------------------------------------------
+|
+| startLesson / completeLesson return the enrollment with `course` as a raw
+| id (not populated), while getEnrollmentById populates it. Replacing state
+| outright therefore drops the populated course and blanks the header title.
+| Keep the previously populated course unless the incoming one is populated.
+|
+*/
+
+const mergeEnrollment = (previous, next) => {
+    if (!next) return previous;
+
+    const nextCourse = next.course;
+
+    const nextCourseIsPopulated =
+        nextCourse &&
+        typeof nextCourse === "object" &&
+        nextCourse.title !== undefined;
+
+    return {
+        ...(previous || {}),
+        ...next,
+        course: nextCourseIsPopulated
+            ? nextCourse
+            : (previous?.course ?? nextCourse),
+    };
+};
+
 const Learning = () => {
 
     const { enrollmentId } = useParams();
@@ -916,8 +947,11 @@ const Learning = () => {
                     lesson._id
                 );
 
-            setEnrollment(
-                response.data.enrollment
+            setEnrollment((previous) =>
+                mergeEnrollment(
+                    previous,
+                    response.data.enrollment
+                )
             );
 
         } catch (error) {
@@ -1067,8 +1101,11 @@ const Learning = () => {
                     selectedLesson._id
                 );
 
-            setEnrollment(
-                response.data
+            setEnrollment((previous) =>
+                mergeEnrollment(
+                    previous,
+                    response.data
+                )
             );
 
         } catch (error) {
@@ -2380,7 +2417,7 @@ const Learning = () => {
                                 {/* Course Material */}
                                 {/* ================================================== */}
 
-                                {/* {selectedLesson.attachments?.length > 0 && (
+                                {selectedLesson.attachments?.length > 0 && (
                                     <section className="mt-10">
                                         <div className="mb-4">
                                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-primary)]">
@@ -2440,7 +2477,7 @@ const Learning = () => {
                                             })}
                                         </div>
                                     </section>
-                                )} */}
+                                )}
 
 
                                 {/* Lesson Quiz */}

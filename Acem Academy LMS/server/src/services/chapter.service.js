@@ -79,7 +79,10 @@ const createChapter = async (
     }
 
     const chapter = await Chapter.create({
-        ...chapterData,
+        title: chapterData.title,
+        description: chapterData.description,
+        subCourse: chapterData.subCourse,
+        position: chapterData.position,
         createdBy: user._id,
         updatedBy: user._id,
     });

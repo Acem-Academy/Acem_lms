@@ -104,7 +104,10 @@ const createTopic = async (
     */
 
     const topic = await Topic.create({
-        ...topicData,
+        title: topicData.title,
+        description: topicData.description,
+        chapter: topicData.chapter,
+        position: topicData.position,
         createdBy: user._id,
         updatedBy: user._id,
     });

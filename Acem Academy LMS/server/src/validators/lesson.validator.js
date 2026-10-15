@@ -1,4 +1,4 @@
-const { body, param } = require("express-validator");
+const { body, param, query } = require("express-validator");
 
 const {
     LESSON_STATUS,
@@ -559,10 +559,27 @@ const submitQuizValidator = [
         ),
 ];
 
+/*
+|--------------------------------------------------------------------------
+| List Lessons
+|--------------------------------------------------------------------------
+*/
+
+const listLessonsValidator = [
+
+    query("topic")
+        .optional({ values: "falsy" })
+        .isMongoId()
+        .withMessage(
+            "Invalid topic id."
+        ),
+];
+
 module.exports = {
     createLessonValidator,
     updateLessonValidator,
     lessonIdValidator,
+    listLessonsValidator,
     publishLessonValidator,
     submitQuizValidator,
 };

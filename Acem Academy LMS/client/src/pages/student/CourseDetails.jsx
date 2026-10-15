@@ -45,6 +45,9 @@ const CourseDetails = () => {
     const [curriculumLoading, setCurriculumLoading] = useState(true);
 
     const [error, setError] = useState("");
+    const [curriculumError, setCurriculumError] = useState("");
+    const [curriculumReloadKey, setCurriculumReloadKey] =
+        useState(0);
 
     const [openSubCourses, setOpenSubCourses] = useState({});
     const [openChapters, setOpenChapters] = useState({});
@@ -178,6 +181,7 @@ const CourseDetails = () => {
             try {
 
                 setCurriculumLoading(true);
+                setCurriculumError("");
 
                 const [
                     subCourseResponse,
@@ -352,6 +356,11 @@ const CourseDetails = () => {
                     error
                 );
 
+                setCurriculumError(
+                    error?.response?.data?.message ||
+                    "Unable to load the curriculum. Please try again."
+                );
+
             } finally {
 
                 setCurriculumLoading(false);
@@ -362,7 +371,7 @@ const CourseDetails = () => {
 
         fetchCurriculum();
 
-    }, [courseId]);
+    }, [courseId, curriculumReloadKey]);
 
 
     /*
@@ -1200,6 +1209,49 @@ const CourseDetails = () => {
                                 <p className="mt-4 text-sm text-[var(--color-text-muted)]">
                                     Loading curriculum...
                                 </p>
+
+                            </div>
+
+                        ) : curriculumError ? (
+
+                            <div
+                                className="
+                                    mt-7
+                                    rounded-2xl
+                                    border
+                                    border-red-900
+                                    bg-red-950/30
+                                    p-10
+                                    text-center
+                                "
+                            >
+
+                                <p className="text-sm text-red-400">
+                                    {curriculumError}
+                                </p>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setCurriculumReloadKey(
+                                            (key) => key + 1
+                                        )
+                                    }
+                                    className="
+                                        mt-4
+                                        rounded-lg
+                                        bg-[var(--color-primary)]
+                                        px-4
+                                        py-2
+                                        text-sm
+                                        font-bold
+                                        text-black
+                                        transition
+                                        hover:bg-[var(--color-primary-dark)]
+                                    "
+                                >
+                                    Retry
+                                </button>
 
                             </div>
 

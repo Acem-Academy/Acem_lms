@@ -6,6 +6,7 @@ const {
     createLessonValidator,
     updateLessonValidator,
     lessonIdValidator,
+    listLessonsValidator,
     publishLessonValidator,
     submitQuizValidator,
 } = require("../validators/lesson.validator");
@@ -114,6 +115,8 @@ router.post(
 router.get(
     "/",
     authenticate,
+    listLessonsValidator,
+    validate,
     lessonController.getLessons
 );
 

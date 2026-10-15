@@ -130,7 +130,13 @@ const createSubCourse = async (
 
     const subCourse = await SubCourse.create({
 
-        ...subCourseData,
+        title: subCourseData.title,
+
+        description: subCourseData.description,
+
+        course: subCourseData.course,
+
+        position: subCourseData.position,
 
         createdBy: user._id,
 

@@ -337,7 +337,12 @@ const createLesson = async (
     */
 
     const lesson = await Lesson.create({
-        ...lessonData,
+        title: lessonData.title,
+        description: lessonData.description,
+        content: lessonData.content,
+        topic: lessonData.topic,
+        position: lessonData.position,
+        isPreview: lessonData.isPreview,
         video,
         attachments,
         quiz: lessonData.quiz || null,
@@ -605,8 +610,64 @@ const getLessons = async (topicId, user) => {
         });
 
     /*
-    | Admin, teachers and non-student roles keep the existing
-    | behaviour: full lesson data through shapeLessonForUser.
+    | Admin has full access.
+    */
+
+    if (user && user.role === ROLES.ADMIN) {
+        return lessons.map((lesson) =>
+            shapeLessonForUser(lesson, user)
+        );
+    }
+
+    /*
+    | Teachers: scoped to courses they own.
+    */
+
+    if (user && user.role === ROLES.TEACHER) {
+        const topicCourseMap =
+            await resolveTopicCourseMap(lessons);
+
+        const ownedCourses = await SubCourse.find().populate(
+            "course",
+            "teacher"
+        );
+
+        const ownedCourseIds = new Set();
+
+        for (const sc of ownedCourses) {
+            const course = sc.course;
+            if (course && course.teacher &&
+                course.teacher.toString() === user._id.toString()) {
+                ownedCourseIds.add(sc.course._id.toString());
+            }
+        }
+
+        const teacherCourses = await require("../models/course.model")
+            .find({ teacher: user._id })
+            .select("_id");
+
+        for (const c of teacherCourses) {
+            ownedCourseIds.add(c._id.toString());
+        }
+
+        const scopedLessons = lessons.filter((lesson) => {
+            const topicKey = lesson.topic
+                ? (lesson.topic._id || lesson.topic).toString()
+                : null;
+            const courseId = topicKey
+                ? topicCourseMap.get(topicKey)
+                : null;
+            return courseId && ownedCourseIds.has(courseId);
+        });
+
+        return scopedLessons.map((lesson) =>
+            shapeLessonForUser(lesson, user)
+        );
+    }
+
+    /*
+    | Non-student non-admin non-teacher: keep previous behavior
+    | as full data (backwards compatibility).
     */
 
     if (!user || user.role !== ROLES.STUDENT) {
@@ -1021,11 +1082,6 @@ const updateLesson = async (
         for (
             const file of files.attachments
         ) {
-            console.log(
-                "📎 Uploading attachment:",
-                file.originalname
-            );
-
             const uploadedFile =
                 await uploadToCloudinary(
                     file.buffer,
@@ -1099,11 +1155,6 @@ const updateLesson = async (
             ...keptAttachments,
             ...newAttachments,
         ];
-
-        console.log(
-            "📎 Attachments before save:",
-            lesson.attachments
-        );
     }
 
     /*
@@ -1134,11 +1185,6 @@ const updateLesson = async (
     */
 
     await lesson.save();
-
-    console.log(
-        "✅ Lesson saved. Attachments:",
-        lesson.attachments
-    );
 
     /*
     |--------------------------------------------------------------------------

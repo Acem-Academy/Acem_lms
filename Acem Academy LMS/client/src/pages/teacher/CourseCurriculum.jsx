@@ -700,19 +700,6 @@ function CourseCurriculum() {
         }[modal.type]
       : "Update the information below and save your changes.";
 
-  if (loading) {
-    return (
-      <div className="p-6">
-        <div className="flex min-h-[500px] items-center justify-center">
-          <div className="flex items-center gap-3 text-slate-500">
-            <Loader2 size={22} className="animate-spin" />
-            <span className="text-sm">Loading curriculum...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-full bg-slate-50 p-4 sm:p-6 lg:p-8">
       {/* Page Header */}

@@ -151,7 +151,7 @@ const MaterialViewer = () => {
                         to={
                             enrollmentId
                                 ? `/student/learning/${enrollmentId}`
-                                : -1
+                                : "/student/my-learning"
                         }
                         className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-bold text-black transition hover:bg-[var(--color-primary-dark)]"
                     >
@@ -172,7 +172,7 @@ const MaterialViewer = () => {
                         to={
                             enrollmentId
                                 ? `/student/learning/${enrollmentId}`
-                                : -1
+                                : "/student/my-learning"
                         }
                         className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-[var(--color-border)] px-3.5 py-2 text-sm font-semibold text-white transition hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-primary)]/5"
                     >

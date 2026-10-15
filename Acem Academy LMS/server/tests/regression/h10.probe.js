@@ -1,15 +1,20 @@
 /*
- * Regression suite: H10 - Lesson List Access (28 assertions).
+ * Regression suite: H10 - Lesson List Access (40 assertions).
  * Read-only (no DB writes). Requires a running API server; PROBE_BASE overrides the URL.
  * Run: npm run test:h10   (or: node tests/regression/run.js h10)
  */
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
 
+const mongoose = require("mongoose");
+const lessonService = require("../../src/services/lesson.service");
+const Lesson = require("../../src/models/lesson.model");
+
 const BASE = process.env.PROBE_BASE || "http://localhost:4319";
 const TOPIC_HTML = "6a7ecff1c66e8b43dd2ccd94"; // course 6a7ec982 (HTML): 2 published + 1 draft
 const DRAFT_LESSON = "6a9ffdeb017ebdb3ccc8d0e3"; // draft w/ quiz, answers [1,2]
 const PUBLISHED_LESSON = "6a7ee40ec66e8b43dd2ccd97"; // "What is HTML?"
+const TOPIC_PHYSICS_QUIZ = "6aa91a127cc1e3248431c182"; // course 6aa919a1 (physics), published lesson w/ 25-question quiz; enrolled student active
 
 const USERS = {
     anon: null,
@@ -145,6 +150,63 @@ const positionsAsc = (list) => list.every((l, i) => i === 0 || l.position >= lis
     const allAscending = ascLists.every((lst) => positionsAsc(lst));
     check("10. topic lesson lists are position-ascending", allAscending && eList.length >= 2,
         `sizes=${ascLists.map((l) => l.length).join("/")} asc=${allAscending}`);
+
+    // 11. Teacher ownership scoping of GET /lessons (service-level, read-only).
+    // No second teacher exists as a real HTTP user, so a synthetic teacher id is
+    // used (same pattern as day4.probe.js Phase 9). Only reads are performed.
+    await mongoose.connect(process.env.MONGODB_URI);
+
+    const fakeTeacher = { _id: new mongoose.Types.ObjectId(), role: "teacher" };
+    const ownerTeacher = { _id: new mongoose.Types.ObjectId(USERS.teacher), role: "teacher" };
+    const adminUser = { _id: new mongoose.Types.ObjectId(USERS.admin), role: "admin" };
+    const enrolledStudentUser = { _id: new mongoose.Types.ObjectId(USERS.enrolled), role: "student" };
+
+    // 11a. Teacher A cannot list Teacher B's lessons without a topic filter.
+    const crossGlobal = await lessonService.getLessons(undefined, fakeTeacher);
+    check("11a. cross-teacher global list is empty (no leak)", Array.isArray(crossGlobal) && crossGlobal.length === 0, `n=${crossGlobal.length}`);
+
+    // 11b. Teacher A cannot list Teacher B's lessons using Teacher B's topicId (HTML).
+    const crossTopicHtml = await lessonService.getLessons(TOPIC_HTML, fakeTeacher);
+    check("11b. cross-teacher foreign topicId (HTML) list is empty (no bypass)", Array.isArray(crossTopicHtml) && crossTopicHtml.length === 0, `n=${crossTopicHtml.length}`);
+
+    // 11c. Same guard for the quiz-bearing foreign topic.
+    const crossTopicQuiz = await lessonService.getLessons(TOPIC_PHYSICS_QUIZ, fakeTeacher);
+    check("11c. cross-teacher foreign topicId (quiz) list is empty (no bypass)", Array.isArray(crossTopicQuiz) && crossTopicQuiz.length === 0, `n=${crossTopicQuiz.length}`);
+
+    // 11d. Teacher can still list their own lessons (incl. own drafts).
+    const ownGlobal = await lessonService.getLessons(undefined, ownerTeacher);
+    const ownIds = ownGlobal.map((l) => String(l._id));
+    check("11d. owner teacher global list keeps own lessons", ownIds.includes(DRAFT_LESSON) && ownIds.includes(PUBLISHED_LESSON), `n=${ownIds.length}`);
+
+    // 11e. Owner teacher topic filter returns own topic lessons only.
+    const ownTopic = await lessonService.getLessons(TOPIC_HTML, ownerTeacher);
+    const ownTopicOk = ownTopic.length >= 1 && ownTopic.every((l) => String(l.topic && (l.topic._id || l.topic)) === TOPIC_HTML);
+    check("11e. owner teacher topic filter returns own topic only", ownTopicOk, `n=${ownTopic.length}`);
+
+    // 12. Admin access unchanged.
+    const totalLessons = await Lesson.countDocuments({ isDeleted: false });
+    const adminGlobal = await lessonService.getLessons(undefined, adminUser);
+    check("12a. admin global list unchanged (all non-deleted lessons)", adminGlobal.length === totalLessons, `n=${adminGlobal.length} total=${totalLessons}`);
+    const adminDraft = adminGlobal.find((l) => String(l._id) === DRAFT_LESSON);
+    const adminQ = adminDraft && adminDraft.quiz && Array.isArray(adminDraft.quiz.questions) ? adminDraft.quiz.questions : [];
+    check("12b. admin keeps quiz answer keys", adminQ.length > 0 && adminQ.every((q) => "correctAnswer" in q), `q=${adminQ.length}`);
+
+    // 13. Student visibility + answer redaction unchanged (non-vacuous: quiz lesson visible).
+    const studentQuizList = await lessonService.getLessons(TOPIC_PHYSICS_QUIZ, enrolledStudentUser);
+    const studentQ = studentQuizList.flatMap((l) => (l.quiz && Array.isArray(l.quiz.questions) ? l.quiz.questions : []));
+    const studentLeak = studentQ.some((q) => "correctAnswer" in q || "explanation" in q);
+    check("13a. student receives visible quiz lesson", studentQ.length === 25, `q=${studentQ.length}`);
+    check("13b. student answer redaction unchanged (service-level)", !studentLeak, `q=${studentQ.length} leak=${studentLeak}`);
+
+    // 14. Malformed topicId is rejected as a client error (not a 500 CastError).
+    const badTopic = await get(USERS.enrolled, "/lessons?topic=not-a-mongo-id");
+    check("14a. malformed topicId => 400 (not 500)", badTopic.status === 400, `status=${badTopic.status} msg=${JSON.stringify(badTopic.raw && badTopic.raw.message)}`);
+    const emptyTopic = await get(USERS.enrolled, "/lessons?topic=");
+    check("14b. empty topic param is ignored => 200", emptyTopic.status === 200, `status=${emptyTopic.status}`);
+    const validTopic = await get(USERS.enrolled, `/lessons?topic=${TOPIC_HTML}`);
+    check("14c. valid topicId still accepted => 200", validTopic.status === 200, `status=${validTopic.status}`);
+
+    await mongoose.disconnect();
 
     const failed = results.filter((r) => !r.ok).length;
     console.log(`\n=== ${results.length - failed}/${results.length} assertions passed, ${failed} failed ===`);
