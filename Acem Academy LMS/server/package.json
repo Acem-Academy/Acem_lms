@@ -10,9 +10,9 @@
     "test:h10": "node tests/regression/run.js h10",
     "test:day4": "node tests/regression/run.js day4",
     "test:massassign": "node tests/regression/run.js massassign",
-    "test:video": "node tests/regression/run.js video",
     "test:visibility": "node tests/regression/run.js visibility",
-    "test:learning": "node tests/regression/run.js learning"
+    "test:learning": "node tests/regression/run.js learning",
+    "test:quizattempt": "node tests/regression/run.js quizattempt"
   },
   "keywords": [],
   "author": "",

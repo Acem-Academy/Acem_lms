@@ -376,6 +376,9 @@ const Learning = () => {
     const [quizAnswers, setQuizAnswers] = useState({});
     const [quizSubmitted, setQuizSubmitted] = useState(false);
     const [quizScore, setQuizScore] = useState(null);
+    const [quizSubmitting, setQuizSubmitting] = useState(false);
+    const [quizError, setQuizError] = useState("");
+    const [quizLimitReached, setQuizLimitReached] = useState(false);
 
     // Used by the "Read Material" PDF viewer link target; was previously
     // referenced via setPdfZoom without ever being declared, which threw
@@ -921,6 +924,9 @@ const Learning = () => {
         setQuizAnswers({});
         setQuizSubmitted(false);
         setQuizScore(null);
+        setQuizSubmitting(false);
+        setQuizError("");
+        setQuizLimitReached(false);
 
         setPdfZoom(0.9);
 
@@ -1018,7 +1024,7 @@ const Learning = () => {
     };
 
     const handleQuizSubmit = async () => {
-        if (!quizQuestions.length) {
+        if (!quizQuestions.length || quizSubmitting || quizLimitReached) {
             return;
         }
 
@@ -1036,9 +1042,14 @@ const Learning = () => {
         |------------------------------------------------------------------
         |
         | The answer key is no longer part of the lesson payload, so the
-        | backend scores the attempt and only returns the result.
+        | backend scores the attempt and only returns the result. Attempt
+        | persistence and the attempt limit are enforced server-side; this
+        | only reflects whatever the server responds with.
         |
         */
+
+        setQuizError("");
+        setQuizSubmitting(true);
 
         try {
             const response = await submitQuiz(
@@ -1064,6 +1075,28 @@ const Learning = () => {
             setQuizSubmitted(true);
         } catch (error) {
             console.error("Failed to submit quiz:", error);
+
+            const status = error?.response?.status;
+            const serverMessage =
+                error?.response?.data?.message;
+
+            // A 403 means the server refused the submission (e.g. the
+            // student has used every allowed attempt). Do not offer a
+            // retake in that case; otherwise the request may be retried.
+            if (status === 403) {
+                setQuizLimitReached(true);
+                setQuizError(
+                    serverMessage ||
+                    "You have reached the maximum number of attempts for this quiz."
+                );
+            } else {
+                setQuizError(
+                    serverMessage ||
+                    "We couldn't submit your quiz. Please check your connection and try again."
+                );
+            }
+        } finally {
+            setQuizSubmitting(false);
         }
     };
 
@@ -1072,6 +1105,7 @@ const Learning = () => {
         setQuizAnswers({});
         setQuizSubmitted(false);
         setQuizScore(null);
+        setQuizError("");
     };
 
     /*
@@ -2809,6 +2843,8 @@ const Learning = () => {
                                                                     handleQuizSubmit
                                                                 }
                                                                 disabled={
+                                                                    quizSubmitting ||
+                                                                    quizLimitReached ||
                                                                     quizQuestions.some(
                                                                         (
                                                                             _,
@@ -2838,15 +2874,32 @@ const Learning = () => {
                                                                     disabled:opacity-40
                                                                 "
                                                             >
-                                                                <Check
-                                                                    size={
-                                                                        17
-                                                                    }
-                                                                />
-                                                                Submit Quiz
+                                                                {quizSubmitting ? (
+                                                                    <Loader2
+                                                                        size={
+                                                                            17
+                                                                        }
+                                                                        className="animate-spin"
+                                                                    />
+                                                                ) : (
+                                                                    <Check
+                                                                        size={
+                                                                            17
+                                                                        }
+                                                                    />
+                                                                )}
+                                                                {quizSubmitting
+                                                                    ? "Submitting..."
+                                                                    : "Submit Quiz"}
                                                             </button>
                                                         )}
                                                     </div>
+
+                                                    {quizError && (
+                                                        <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                                                            {quizError}
+                                                        </div>
+                                                    )}
 
                                                     {typeof quizAnswers[
                                                         quizQuestionIndex
@@ -2934,40 +2987,44 @@ const Learning = () => {
                                                             {selectedLesson.quiz
                                                                 .passingScore ??
                                                                 70}
-                                                            %. You can review
-                                                            your answers and try
-                                                            again if allowed.
+                                                            %. Your attempts are
+                                                            recorded on the
+                                                            server, so a retake
+                                                            is only allowed while
+                                                            attempts remain.
                                                         </p>
 
-                                                        <button
-                                                            type="button"
-                                                            onClick={
-                                                                handleQuizReset
-                                                            }
-                                                            className="
-                                                                mx-auto
-                                                                mt-6
-                                                                flex
-                                                                items-center
-                                                                justify-center
-                                                                gap-2
-                                                                rounded-xl
-                                                                border
-                                                                border-[var(--color-border)]
-                                                                px-5
-                                                                py-3
-                                                                text-sm
-                                                                font-semibold
-                                                                text-white
-                                                                transition
-                                                                hover:border-[var(--color-primary)]/40
-                                                            "
-                                                        >
-                                                            <RotateCcw
-                                                                size={16}
-                                                            />
-                                                            Retake Quiz
-                                                        </button>
+                                                        {!quizLimitReached && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={
+                                                                    handleQuizReset
+                                                                }
+                                                                className="
+                                                                    mx-auto
+                                                                    mt-6
+                                                                    flex
+                                                                    items-center
+                                                                    justify-center
+                                                                    gap-2
+                                                                    rounded-xl
+                                                                    border
+                                                                    border-[var(--color-border)]
+                                                                    px-5
+                                                                    py-3
+                                                                    text-sm
+                                                                    font-semibold
+                                                                    text-white
+                                                                    transition
+                                                                    hover:border-[var(--color-primary)]/40
+                                                                "
+                                                            >
+                                                                <RotateCcw
+                                                                    size={16}
+                                                                />
+                                                                Retake Quiz
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}

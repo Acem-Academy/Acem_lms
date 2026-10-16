@@ -3,6 +3,7 @@ const Topic = require("../models/topic.model");
 const Chapter = require("../models/chapter.model");
 const SubCourse = require("../models/subCourse.model");
 const Enrollment = require("../models/enrollment.model");
+const QuizAttempt = require("../models/quizAttempt.model");
 const {
     uploadToCloudinary,
 } = require("../utils/cloudinary");
@@ -19,6 +20,7 @@ const {
 } = require("../constants/enrollment.constants");
 
 const {
+    resolveOwningCourse,
     assertCurriculumOwnership,
     assertLessonReadAccess,
 } = require("../utils/ownership");
@@ -785,11 +787,102 @@ const getLessonById = async (lessonId, user) => {
 
 /*
 |--------------------------------------------------------------------------
+| Quiz Attempt Limit
+|--------------------------------------------------------------------------
+|
+| Attempt limiting follows the existing quiz schema (maxAttempts: Number,
+| default 1, min 1). A finite value >= 1 is an enforced limit; anything
+| else (omitted, 0, null) means the quiz has no attempt limit.
+|
+*/
+
+const MAX_ATTEMPT_INSERT_RETRIES = 10;
+
+const getQuizAttemptLimit = (quiz) => {
+
+    const raw = Number(quiz?.maxAttempts);
+
+    if (Number.isFinite(raw) && raw >= 1) {
+        return Math.floor(raw);
+    }
+
+    return null;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Record Quiz Attempt
+|--------------------------------------------------------------------------
+|
+| Persists an attempt and enforces maxAttempts without relying on
+| multi-document transactions. attemptNumber is derived from the current
+| attempt count and protected by a unique (student, lesson, attemptNumber)
+| index, so two concurrent submissions can never both claim a slot:
+| the loser hits a duplicate-key error, re-counts, and is rejected once
+| the limit is reached.
+|
+*/
+
+const recordQuizAttempt = async ({
+    student,
+    lessonId,
+    limit,
+    base,
+}) => {
+
+    for (
+        let pass = 0;
+        pass < MAX_ATTEMPT_INSERT_RETRIES;
+        pass++
+    ) {
+
+        const used = await QuizAttempt.countDocuments({
+            student,
+            lesson: lessonId,
+        });
+
+        if (limit !== null && used >= limit) {
+            throw new ApiError(
+                403,
+                "You have reached the maximum number of attempts for this quiz."
+            );
+        }
+
+        try {
+            return await QuizAttempt.create({
+                ...base,
+                attemptNumber: used + 1,
+            });
+        } catch (error) {
+
+            /*
+            | A concurrent submission inserted the same attemptNumber.
+            | Re-count and retry; when the limit is reached the next pass
+            | throws instead of inserting.
+            */
+
+            if (error && error.code === 11000) {
+                continue;
+            }
+
+            throw error;
+        }
+    }
+
+    throw new ApiError(
+        409,
+        "Could not record the quiz attempt due to concurrent submissions. Please try again."
+    );
+};
+
+/*
+|--------------------------------------------------------------------------
 | Submit Quiz
 |--------------------------------------------------------------------------
 |
 | Server-side scoring. The answer key stays in the database: only the
-| calculated result is returned. No attempt tracking, no extra state.
+| calculated result is returned. Student attempts are persisted and
+| maxAttempts is enforced server-side.
 |
 */
 
@@ -889,12 +982,71 @@ const submitQuiz = async (
             ? Number(quiz.passingScore)
             : 70;
 
-    return {
+    const result = {
         earnedPoints,
         totalPoints,
         percentage,
         passed: percentage >= passingScore,
     };
+
+    /*
+    |--------------------------------------------------------------------------
+    | Persist Attempt + Enforce maxAttempts
+    |--------------------------------------------------------------------------
+    |
+    | Attempt persistence and the attempt limit apply to students. Teachers
+    | and admins keep the previous score-only behavior.
+    |
+    */
+
+    if (isStudent(user)) {
+
+        const course = await resolveOwningCourse(
+            "lesson",
+            lesson._id
+        );
+
+        let courseId = null;
+        let enrollmentId = null;
+
+        if (course) {
+            courseId = course._id;
+
+            const enrollment = await Enrollment.findOne({
+                student: user._id,
+                course: course._id,
+                status: {
+                    $ne: ENROLLMENT_STATUS.CANCELLED,
+                },
+            }).select("_id");
+
+            if (enrollment) {
+                enrollmentId = enrollment._id;
+            }
+        }
+
+        await recordQuizAttempt({
+            student: user._id,
+            lessonId: lesson._id,
+            limit: getQuizAttemptLimit(quiz),
+            base: {
+                student: user._id,
+                lesson: lesson._id,
+                course: courseId,
+                enrollment: enrollmentId,
+                answers: answers.map(
+                    (answer) => Number(answer)
+                ),
+                earnedPoints,
+                totalPoints,
+                percentage,
+                passed: result.passed,
+                submittedAt: new Date(),
+            },
+        });
+    }
+
+    return result;
 };
 
 /*

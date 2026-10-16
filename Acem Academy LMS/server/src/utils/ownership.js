@@ -265,6 +265,7 @@ const assertLessonReadAccess = async (
 };
 
 module.exports = {
+    resolveOwningCourse,
     assertCurriculumOwnership,
     assertLessonReadAccess,
     OWNERSHIP_DENIED_MESSAGE,

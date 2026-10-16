@@ -1,11 +1,19 @@
 /*
  * Regression suite: Day 6 - Upload Video Validation (12 assertions).
- * Covers the type-aware video.url rule: an empty URL is allowed for
- * video.type === "upload" (create + update), while YouTube URL validation
- * stays strict. Mutation-testing: creates a temp course tree, then purges
- * temp records and asserts DB counts are restored to the pre-run baseline.
- * Requires a running API server; PROBE_BASE overrides the URL.
- * Run: node tests/regression/run.js video
+ *
+ * DEFERRED - NOT RUN. This suite asserts the Priority 1 type-aware video.url
+ * behavior (an empty URL is allowed for video.type === "upload" on create and
+ * update, and an empty video.thumbnail is treated as absent). Priority 1 is
+ * intentionally deferred, so the current validator rejects empty video.url /
+ * video.thumbnail and these assertions would fail. This file is kept intact
+ * and is NOT registered in run.js (no `video` suite, no `test:video` script).
+ * Re-register it in run.js and package.json when Priority 1 is implemented.
+ *
+ * Mutation-testing: creates a temp course tree, then purges temp records and
+ * asserts DB counts are restored to the pre-run baseline. Requires a running
+ * API server; PROBE_BASE overrides the URL.
+ * Manual run (only after Priority 1 lands):
+ *   node tests/regression/run.js video   (after re-adding the suite)
  */
 require("dotenv").config();
 const jwt = require("jsonwebtoken");

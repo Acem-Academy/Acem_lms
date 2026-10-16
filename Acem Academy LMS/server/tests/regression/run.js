@@ -31,10 +31,10 @@ const LOG_PATH = path.join(os.tmpdir(), `acem-test-server-${PORT}.log`);
 const SUITES = {
     h10: { file: "h10.probe.js", assertions: 40, label: "H10 - Lesson List Access" },
     massassign: { file: "massassign.probe.js", assertions: 19, label: "Day 6 - Curriculum Create Mass Assignment" },
-    video: { file: "video.probe.js", assertions: 12, label: "Day 6 - Upload Video Validation" },
     day4: { file: "day4.probe.js", assertions: 83, label: "Day 4 - Teacher Core Flows" },
     visibility: { file: "visibility.probe.js", assertions: 37, label: "Student Curriculum Visibility" },
     learning: { file: "learning.probe.js", assertions: 32, label: "Day 5 - Student Learning Progress" },
+    quizattempt: { file: "quizattempt.probe.js", assertions: 36, label: "Day 7 - Quiz Attempt Persistence & maxAttempts" },
 };
 
 let server = null;

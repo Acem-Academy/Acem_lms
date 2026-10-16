@@ -57,6 +57,17 @@ const preexisting = {};
 
 const purgeTempRecords = async (db) => {
     const summary = {};
+
+    /*
+    | Quiz attempts recorded through the API for these temp lessons would be
+    | left orphaned (pointing at a purged lesson) once the lessons are removed.
+    */
+    if (created.lessons.length) {
+        const lessonIds = created.lessons.filter(Boolean).map((x) => new mongoose.Types.ObjectId(x));
+        const res = await db.collection("quizattempts").deleteMany({ lesson: { $in: lessonIds } });
+        summary.quizattempts = res.deletedCount;
+    }
+
     for (const coll of [...COLLECTIONS, "enrollments"]) {
         let deleted = 0;
         const ids = created[coll].filter(Boolean).map((x) => new mongoose.Types.ObjectId(x));
