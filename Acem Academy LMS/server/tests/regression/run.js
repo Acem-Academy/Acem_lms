@@ -34,6 +34,7 @@ const SUITES = {
     day4: { file: "day4.probe.js", assertions: 83, label: "Day 4 - Teacher Core Flows" },
     visibility: { file: "visibility.probe.js", assertions: 37, label: "Student Curriculum Visibility" },
     learning: { file: "learning.probe.js", assertions: 32, label: "Day 5 - Student Learning Progress" },
+    video: { file: "video.probe.js", assertions: 12, label: "Day 6 - Upload Video Validation" },
     quizattempt: { file: "quizattempt.probe.js", assertions: 36, label: "Day 7 - Quiz Attempt Persistence & maxAttempts" },
 };
 

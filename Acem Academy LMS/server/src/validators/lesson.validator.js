@@ -85,7 +85,7 @@ const createLessonValidator = [
     */
 
     body("video.url")
-        .optional()
+        .optional({ values: "falsy" })
         .trim()
         .isURL()
         .withMessage(
@@ -126,7 +126,7 @@ const createLessonValidator = [
     */
 
     body("video.thumbnail")
-        .optional()
+        .optional({ values: "falsy" })
         .trim()
         .isURL()
         .withMessage(
@@ -325,7 +325,7 @@ const updateLessonValidator = [
     */
 
     body("video.url")
-        .optional()
+        .optional({ values: "falsy" })
         .trim()
         .isURL()
         .withMessage(
@@ -366,7 +366,7 @@ const updateLessonValidator = [
     */
 
     body("video.thumbnail")
-        .optional()
+        .optional({ values: "falsy" })
         .trim()
         .isURL()
         .withMessage(

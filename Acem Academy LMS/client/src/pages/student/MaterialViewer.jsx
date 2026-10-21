@@ -7,6 +7,7 @@ import {
     ArrowLeft,
     ChevronLeft,
     ChevronRight,
+    ExternalLink,
     FileText,
     Loader2,
     Minus,
@@ -336,6 +337,16 @@ const MaterialViewer = () => {
                             <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">
                                 This material type cannot be previewed here.
                             </p>
+
+                            <a
+                                href={attachment.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-bold text-black transition hover:bg-[var(--color-primary-dark)]"
+                            >
+                                <ExternalLink size={16} />
+                                Open Material
+                            </a>
                         </div>
                     </div>
                 )}

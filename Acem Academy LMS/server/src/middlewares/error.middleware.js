@@ -17,6 +17,16 @@ const errorHandler = (err, req, res, next) => {
             409,
             "Duplicate value. The resource already exists."
         );
+    } else if (
+        error &&
+        error.name === "MulterError"
+    ) {
+        error = new ApiError(
+            400,
+            error.code === "LIMIT_FILE_SIZE"
+                ? "File is too large. The maximum upload size is 100 MB."
+                : "Invalid file upload."
+        );
     } else if (!(error instanceof ApiError)) {
         error = new ApiError(
             error.statusCode || 500,

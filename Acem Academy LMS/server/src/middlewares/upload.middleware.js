@@ -17,12 +17,13 @@ const fileFilter = (req, file, cb) => {
     ];
 
     if (!allowedTypes.includes(file.mimetype)) {
-        return cb(
-            new Error(
-                "Unsupported file type."
-            ),
-            false
+        const error = new Error(
+            "Unsupported file type."
         );
+
+        error.statusCode = 400;
+
+        return cb(error, false);
     }
 
     cb(null, true);
