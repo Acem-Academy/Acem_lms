@@ -2,6 +2,10 @@ const express = require("express");
 const {
     registerValidator,
     loginValidator,
+    verifyEmailValidator,
+    resendVerificationValidator,
+    forgotPasswordValidator,
+    resetPasswordValidator,
     changePasswordValidator,
     updateProfileValidator
 } = require("../validators/auth.validator");
@@ -28,6 +32,30 @@ router.post(
 router.post(
     "/refresh-token",
     authController.refreshAccessToken
+);
+router.post(
+    "/verify-email",
+    verifyEmailValidator,
+    validate,
+    authController.verifyEmail
+);
+router.post(
+    "/resend-verification",
+    resendVerificationValidator,
+    validate,
+    authController.resendVerification
+);
+router.post(
+    "/forgot-password",
+    forgotPasswordValidator,
+    validate,
+    authController.forgotPassword
+);
+router.post(
+    "/reset-password",
+    resetPasswordValidator,
+    validate,
+    authController.resetPassword
 );
 // Protected Routes
 router.post(

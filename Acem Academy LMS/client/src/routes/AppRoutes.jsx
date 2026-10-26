@@ -7,8 +7,12 @@ import {
 
 import Login from "@/pages/auth/Login";
 import Register from "@/pages/auth/Register";
+import VerifyEmail from "@/pages/auth/VerifyEmail";
+import ForgotPassword from "@/pages/auth/ForgotPassword";
 
 import AdminDashboard from "@/pages/admin/Dashboard";
+import AdminUsers from "@/pages/admin/Users";
+import AdminCourses from "@/pages/admin/Courses";
 import TeacherDashboard from "@/pages/teacher/Dashboard";
 import TeacherCourses from "@/pages/teacher/Courses";
 import CourseManagement from "@/pages/teacher/CourseManagement";
@@ -19,6 +23,7 @@ import GetStudents from "@/pages/teacher/GetStudents";
 
 import StudentLayout from "@/layouts/StudentLayout";
 import TeacherLayout from "@/layouts/TeacherLayout";
+import AdminLayout from "@/layouts/AdminLayout";
 
 import StudentDashboard from "@/pages/student/Dashboard";
 import StudentCourses from "@/pages/student/Courses";
@@ -84,19 +89,82 @@ function AppRoutes() {
           }
         />
 
+        <Route
+          path={ROUTES.VERIFY_EMAIL}
+          element={
+            <PublicRoute>
+              <VerifyEmail />
+            </PublicRoute>
+          }
+        />
+
+        <Route
+          path={ROUTES.FORGOT_PASSWORD}
+          element={
+            <PublicRoute>
+              <ForgotPassword />
+            </PublicRoute>
+          }
+        />
+
 
         {/* ====================================================== */}
         {/* Admin */}
         {/* ====================================================== */}
 
         <Route
-          path={ROUTES.ADMIN.DASHBOARD}
+          path={ROUTES.ADMIN.ROOT}
           element={
             <ProtectedRoute roles={[ROLES.ADMIN]}>
-              <AdminDashboard />
+              <AdminLayout />
             </ProtectedRoute>
           }
-        />
+        >
+          {/* /admin → /admin/dashboard */}
+
+          <Route
+            index
+            element={
+              <Navigate
+                to={ROUTES.ADMIN.DASHBOARD}
+                replace
+              />
+            }
+          />
+
+          {/* Admin Dashboard */}
+
+          <Route
+            path="dashboard"
+            element={
+              <ProtectedRoute roles={[ROLES.ADMIN]}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin Users */}
+
+          <Route
+            path="users"
+            element={
+              <ProtectedRoute roles={[ROLES.ADMIN]}>
+                <AdminUsers />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin Courses */}
+
+          <Route
+            path="courses"
+            element={
+              <ProtectedRoute roles={[ROLES.ADMIN]}>
+                <AdminCourses />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
 
 
        {/* ====================================================== */}

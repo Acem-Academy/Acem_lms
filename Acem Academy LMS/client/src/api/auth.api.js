@@ -20,3 +20,15 @@ export const changePasswordApi = (data) =>
 
 export const updateProfileApi = (data) =>
   axiosInstance.patch("/auth/profile", data);
+
+export const verifyEmailApi = (data) =>
+  axiosInstance.post("/auth/verify-email", data);
+
+export const resendVerificationApi = (data) =>
+  axiosInstance.post("/auth/resend-verification", data);
+
+export const forgotPasswordApi = (data) =>
+  axiosInstance.post("/auth/forgot-password", data);
+
+export const resetPasswordApi = (data) =>
+  axiosInstance.post("/auth/reset-password", data);

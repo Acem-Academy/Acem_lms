@@ -88,6 +88,62 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
 });
 
+const verifyEmail = asyncHandler(async (req, res) => {
+
+    await authService.verifyEmail(req.body);
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            null,
+            "Email verified successfully"
+        )
+    );
+
+});
+
+const resendVerification = asyncHandler(async (req, res) => {
+
+    await authService.resendVerificationEmail(req.body);
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            null,
+            "If an unverified account exists, a new verification code has been sent."
+        )
+    );
+
+});
+
+const forgotPassword = asyncHandler(async (req, res) => {
+
+    await authService.requestPasswordReset(req.body);
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            null,
+            "If an account exists with that email, a password reset code has been sent."
+        )
+    );
+
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+
+    await authService.resetUserPassword(req.body);
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            null,
+            "Password reset successfully. Please sign in with your new password."
+        )
+    );
+
+});
+
 const getProfile = asyncHandler(async (req, res) => {
 
     const user = await authService.getUserProfile(req.user);
@@ -141,6 +197,10 @@ module.exports = {
     login,
     logout,
     refreshAccessToken,
+    verifyEmail,
+    resendVerification,
+    forgotPassword,
+    resetPassword,
     getProfile,
     updateProfile,
     changePassword,

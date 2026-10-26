@@ -20,9 +20,11 @@ export function AuthProvider({ children }) {
 
       const response = await authService.getProfile();
 
-      setUser(response.data);
+      const profile = response?.data ?? response;
 
-      return response.data;
+      setUser(profile);
+
+      return profile;
     } catch (error) {
       setUser(null);
 
@@ -65,6 +67,7 @@ export function AuthProvider({ children }) {
       logout,
 
       refreshProfile,
+      updateUser: setUser,
     }),
     [user, loading]
   );

@@ -37,6 +37,9 @@ function RegisterForm() {
     const [isSubmitting, setIsSubmitting] =
         useState(false);
 
+    const [authError, setAuthError] =
+        useState("");
+
     const {
         register,
         handleSubmit,
@@ -58,6 +61,7 @@ function RegisterForm() {
         try {
 
             setIsSubmitting(true);
+            setAuthError("");
 
             const {
                 confirmPassword,
@@ -66,15 +70,20 @@ function RegisterForm() {
 
             await registerUser(registerData);
 
-            alert("Registration successful!");
-
-            navigate(ROUTES.LOGIN);
+            navigate(
+                `${ROUTES.VERIFY_EMAIL}?email=${encodeURIComponent(
+                    registerData.email
+                )}`,
+                {
+                    replace: true,
+                }
+            );
 
         } catch (error) {
 
             console.error(error);
 
-            alert(
+            setAuthError(
                 error?.response?.data?.message ||
                 "Registration failed"
             );
@@ -449,6 +458,27 @@ function RegisterForm() {
                         )}
 
                     </div>
+
+
+                    {authError && (
+
+                        <p
+                            role="alert"
+                            className="
+                                rounded-xl
+                                border
+                                border-red-900
+                                bg-red-950/30
+                                px-4
+                                py-3
+                                text-sm
+                                text-red-400
+                            "
+                        >
+                            {authError}
+                        </p>
+
+                    )}
 
 
                     {/* ================================================== */}

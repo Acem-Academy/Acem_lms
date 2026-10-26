@@ -29,3 +29,23 @@ export const updateProfile = async (data) => {
   const response = await authApi.updateProfileApi(data);
   return response.data;
 };
+
+export const verifyEmail = async (data) => {
+  const response = await authApi.verifyEmailApi(data);
+  return response.data;
+};
+
+export const resendVerification = async (data) => {
+  const response = await authApi.resendVerificationApi(data);
+  return response.data;
+};
+
+export const forgotPassword = async (data) => {
+  const response = await authApi.forgotPasswordApi(data);
+  return response.data;
+};
+
+export const resetPassword = async (data) => {
+  const response = await authApi.resetPasswordApi(data);
+  return response.data;
+};

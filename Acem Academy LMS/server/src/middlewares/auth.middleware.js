@@ -12,10 +12,16 @@ const authenticate = async (req, res, next) => {
             throw new ApiError(401, "Authentication required");
         }
 
-        const decodedToken = jwt.verify(
-            accessToken,
-            process.env.ACCESS_TOKEN_SECRET
-        );
+        let decodedToken;
+
+        try {
+            decodedToken = jwt.verify(
+                accessToken,
+                process.env.ACCESS_TOKEN_SECRET
+            );
+        } catch {
+            throw new ApiError(401, "Invalid or expired token");
+        }
 
         const user = await User.findOne({
             _id: decodedToken.id,

@@ -4,6 +4,13 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const ApiError = require("../utils/ApiError");
 const STATUS = require("../constants/status");
+const { OTP_PURPOSES } = require("../constants/otp");
+const {
+    issueOtp,
+    validateOtp,
+    consumeOtp,
+    deleteOtp,
+} = require("./otp.service");
 
 /* -------------------------------------------------------------------------- */
 /*                           Private Helper Functions                          */
@@ -48,8 +55,11 @@ const generateRefreshToken = (userId) => {
 
 const PUBLIC_REGISTRATION_FIELDS = ["fullName", "email", "password"];
 
+const normalizeEmail = (email) => String(email).trim().toLowerCase();
+
 const registerUser = async (userData) => {
-    const { email, password } = userData;
+    const { password } = userData;
+    const email = normalizeEmail(userData.email);
 
     const existingUser = await User.findOne({ email });
 
@@ -65,9 +75,23 @@ const registerUser = async (userData) => {
         newUser[field] = userData[field];
     }
 
+    newUser.email = email;
     newUser.password = hashedPassword;
+    newUser.isEmailVerified = false;
 
     const user = await User.create(newUser);
+
+    try {
+        await issueOtp(
+            email,
+            OTP_PURPOSES.EMAIL_VERIFICATION
+        );
+    } catch (error) {
+        console.error(
+            "Unable to issue email verification code:",
+            error && error.message
+        );
+    }
 
     const createdUser = await User.findById(user._id)
         .select("-password -refreshToken");
@@ -80,7 +104,8 @@ const registerUser = async (userData) => {
 /* -------------------------------------------------------------------------- */
 
 const loginUser = async (loginData) => {
-    const { email, password } = loginData;
+    const { password } = loginData;
+    const email = normalizeEmail(loginData.email);
 
     const user = await User.findOne({
         email,
@@ -105,6 +130,14 @@ const loginUser = async (loginData) => {
 
     if (!isPasswordCorrect) {
         throw new ApiError(401, "Invalid email or password");
+    }
+
+    if (user.isEmailVerified === false) {
+        throw new ApiError(
+            403,
+            "Please verify your email address before signing in.",
+            ["EMAIL_NOT_VERIFIED"]
+        );
     }
 
     const accessToken = generateAccessToken(user._id, user.role);
@@ -158,8 +191,10 @@ const refreshUserAccessToken = async (cookies) => {
         throw new ApiError(401, "Invalid or expired refresh token");
     }
 
-    const user = await User.findById(decodedToken.id)
-        .select("+refreshToken");
+    const user = await User.findOne({
+        _id: decodedToken.id,
+        isDeleted: false,
+    }).select("+refreshToken");
 
     if (!user) {
         throw new ApiError(401, "User not found");
@@ -173,6 +208,13 @@ const refreshUserAccessToken = async (cookies) => {
         throw new ApiError(
             403,
             "Your account is inactive. Please contact the administrator."
+        );
+    }
+
+    if (user.isEmailVerified === false) {
+        throw new ApiError(
+            403,
+            "Please verify your email address before signing in."
         );
     }
 
@@ -202,17 +244,35 @@ const getUserProfile = async (user) => {
 
 const updateUserProfile = async (userId, body) => {
 
-    const { fullName } = body;
+    const updates = {};
 
-    await User.findByIdAndUpdate(
-        userId,
-        {
-            fullName,
+    if (body.fullName !== undefined) {
+        updates.fullName = body.fullName;
+    }
+
+    if (body.email !== undefined) {
+        const email = normalizeEmail(body.email);
+
+        const existingUser = await User.findOne({
+            email,
+            _id: { $ne: userId },
+        });
+
+        if (existingUser) {
+            throw new ApiError(409, "Email already registered");
         }
-    );
 
-    const updatedUser = await User.findById(userId)
-        .select("-password -refreshToken");
+        updates.email = email;
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        updates,
+        {
+            new: true,
+            runValidators: true,
+        }
+    ).select("-password -refreshToken");
 
     return updatedUser;
 
@@ -251,10 +311,167 @@ const changeUserPassword = async (userId, body) => {
 
     await User.findByIdAndUpdate(userId, {
         password: hashedPassword,
+        refreshToken: null,
     });
 
 };
 
+
+/* -------------------------------------------------------------------------- */
+/*                            Verify Email Address                            */
+/* -------------------------------------------------------------------------- */
+
+const verifyEmail = async (body) => {
+    const email = normalizeEmail(body.email);
+
+    const user = await User.findOne({
+        email,
+        isDeleted: false,
+    });
+
+    if (!user) {
+        throw new ApiError(
+            400,
+            "Invalid or expired verification code"
+        );
+    }
+
+    await consumeOtp(
+        email,
+        OTP_PURPOSES.EMAIL_VERIFICATION,
+        body.otp
+    );
+
+    const updatedUser = await User.findByIdAndUpdate(
+        user._id,
+        {
+            isEmailVerified: true,
+        },
+        {
+            new: true,
+        }
+    ).select("-password -refreshToken");
+
+    await deleteOtp(
+        email,
+        OTP_PURPOSES.EMAIL_VERIFICATION
+    );
+
+    return updatedUser;
+};
+
+/* -------------------------------------------------------------------------- */
+/*                        Resend Email Verification                           */
+/* -------------------------------------------------------------------------- */
+
+const resendVerificationEmail = async (body) => {
+    const email = normalizeEmail(body.email);
+
+    const user = await User.findOne({
+        email,
+        isDeleted: false,
+    });
+
+    if (user && user.isEmailVerified === false) {
+        await issueOtp(
+            email,
+            OTP_PURPOSES.EMAIL_VERIFICATION
+        );
+    }
+
+    return true;
+};
+
+/* -------------------------------------------------------------------------- */
+/*                          Request Password Reset                            */
+/* -------------------------------------------------------------------------- */
+
+const requestPasswordReset = async (body) => {
+    const email = normalizeEmail(body.email);
+
+    const user = await User.findOne({
+        email,
+        isDeleted: false,
+        status: STATUS.ACTIVE,
+    });
+
+    if (user && user.isEmailVerified !== false) {
+        try {
+            await issueOtp(
+                email,
+                OTP_PURPOSES.PASSWORD_RESET
+            );
+        } catch (error) {
+            if (
+                !error ||
+                error.statusCode !== 429
+            ) {
+                throw error;
+            }
+        }
+    }
+
+    return true;
+};
+
+/* -------------------------------------------------------------------------- */
+/*                            Reset User Password                             */
+/* -------------------------------------------------------------------------- */
+
+const resetUserPassword = async (body) => {
+    const email = normalizeEmail(body.email);
+
+    const user = await User.findOne({
+        email,
+        isDeleted: false,
+        status: STATUS.ACTIVE,
+    }).select("+password");
+
+    if (!user || user.isEmailVerified === false) {
+        throw new ApiError(
+            400,
+            "Invalid or expired reset code"
+        );
+    }
+
+    await validateOtp(
+        email,
+        OTP_PURPOSES.PASSWORD_RESET,
+        body.otp
+    );
+
+    const isSamePassword = await comparePassword(
+        body.newPassword,
+        user.password
+    );
+
+    if (isSamePassword) {
+        throw new ApiError(
+            400,
+            "New password must be different from the old password"
+        );
+    }
+
+    const hashedPassword = await hashPassword(
+        body.newPassword
+    );
+
+    await consumeOtp(
+        email,
+        OTP_PURPOSES.PASSWORD_RESET,
+        body.otp
+    );
+
+    await User.findByIdAndUpdate(user._id, {
+        password: hashedPassword,
+        refreshToken: null,
+    });
+
+    await deleteOtp(
+        email,
+        OTP_PURPOSES.PASSWORD_RESET
+    );
+};
 
 module.exports = {
     registerUser,
@@ -264,4 +481,8 @@ module.exports = {
     getUserProfile,
     updateUserProfile,
     changeUserPassword,
+    verifyEmail,
+    resendVerificationEmail,
+    requestPasswordReset,
+    resetUserPassword,
 };

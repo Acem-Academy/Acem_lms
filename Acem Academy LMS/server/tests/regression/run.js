@@ -36,6 +36,9 @@ const SUITES = {
     learning: { file: "learning.probe.js", assertions: 32, label: "Day 5 - Student Learning Progress" },
     video: { file: "video.probe.js", assertions: 12, label: "Day 6 - Upload Video Validation" },
     quizattempt: { file: "quizattempt.probe.js", assertions: 36, label: "Day 7 - Quiz Attempt Persistence & maxAttempts" },
+    auth: { file: "auth.probe.js", assertions: 45, label: "Day 9 - Authentication & Profile Management" },
+    authotp: { file: "authotp.probe.js", assertions: 65, label: "Day 10 - Email OTP & Password Recovery" },
+    admin: { file: "admin.probe.js", assertions: 41, label: "Day 10 - Admin Management & RBAC" },
 };
 
 let server = null;
@@ -103,7 +106,11 @@ async function main() {
         logFd = fs.openSync(LOG_PATH, "w");
         server = spawn(process.execPath, ["src/server.js"], {
             cwd: SERVER_ROOT,
-            env: { ...process.env, PORT: String(PORT) },
+            env: {
+                ...process.env,
+                PORT: String(PORT),
+                DISABLE_EMAIL: "true",
+            },
             stdio: ["ignore", logFd, logFd],
         });
         server.on("error", (e) => console.error("[runner] server spawn error:", e.message));

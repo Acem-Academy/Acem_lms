@@ -16,6 +16,7 @@ const subCourseRoutes = require("./routes/subCourse.routes");
 const chapterRoutes = require("./routes/chapter.routes");
 const topicRoutes = require("./routes/topic.routes");
 const lessonRoutes = require("./routes/lesson.routes");
+const adminRoutes = require("./routes/admin.routes");
 
 // Middlewares
 app.use(express.json());
@@ -47,6 +48,7 @@ app.use("/api/v1/sub-courses", subCourseRoutes);
 app.use("/api/v1/chapters", chapterRoutes);
 app.use("/api/v1/topics", topicRoutes);
 app.use("/api/v1/lessons", lessonRoutes);
+app.use("/api/v1/admin", adminRoutes);
 
 // 404 Route
 app.use((req, res) => {

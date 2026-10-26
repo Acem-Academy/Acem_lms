@@ -42,6 +42,11 @@ const userSchema = new mongoose.Schema(
             default: STATUS.ACTIVE,
         },
 
+        isEmailVerified: {
+            type: Boolean,
+            default: true,
+        },
+
         avatar: {
             url: {
                 type: String,

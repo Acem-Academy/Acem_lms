@@ -36,6 +36,9 @@ function LoginForm() {
     const [isSubmitting, setIsSubmitting] =
         useState(false);
 
+    const [authError, setAuthError] =
+        useState("");
+
     const {
         register,
         handleSubmit,
@@ -54,11 +57,20 @@ function LoginForm() {
         try {
 
             setIsSubmitting(true);
+            setAuthError("");
 
             const loggedInUser =
                 await login(formData);
 
-            if (!loggedInUser) return;
+            if (!loggedInUser) {
+
+                setAuthError(
+                    "Unable to load your profile. Please try again."
+                );
+
+                return;
+
+            }
 
             switch (loggedInUser.role) {
 
@@ -112,6 +124,31 @@ function LoginForm() {
         } catch (error) {
 
             console.error(error);
+
+            const message =
+                error?.response?.data?.message ||
+                "Unable to sign in. Please try again.";
+
+            const errors =
+                error?.response?.data?.errors;
+
+            if (
+                error?.response?.status === 403 &&
+                Array.isArray(errors) &&
+                errors.includes("EMAIL_NOT_VERIFIED")
+            ) {
+
+                navigate(
+                    `${ROUTES.VERIFY_EMAIL}?email=${encodeURIComponent(
+                        formData.email
+                    )}`
+                );
+
+                return;
+
+            }
+
+            setAuthError(message);
 
         } finally {
 
@@ -347,6 +384,27 @@ function LoginForm() {
                     </div>
 
 
+                    {authError && (
+
+                        <p
+                            role="alert"
+                            className="
+                                rounded-xl
+                                border
+                                border-red-900
+                                bg-red-950/30
+                                px-4
+                                py-3
+                                text-sm
+                                text-red-400
+                            "
+                        >
+                            {authError}
+                        </p>
+
+                    )}
+
+
                     {/* ================================================== */}
                     {/* Remember / Forgot */}
                     {/* ================================================== */}
@@ -375,8 +433,8 @@ function LoginForm() {
                         </div>
 
 
-                        <button
-                            type="button"
+                        <Link
+                            to={ROUTES.FORGOT_PASSWORD}
                             className="
                                 text-sm
                                 font-medium
@@ -387,7 +445,7 @@ function LoginForm() {
                             "
                         >
                             Forgot Password?
-                        </button>
+                        </Link>
 
                     </div>
 

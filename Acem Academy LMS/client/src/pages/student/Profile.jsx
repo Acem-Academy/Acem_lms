@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -30,21 +30,7 @@ function Profile() {
 
    const navigate = useNavigate();
 
-const { logout } = useAuth();
-
-    /*
-    |--------------------------------------------------------------------------
-    | User State
-    |--------------------------------------------------------------------------
-    */
-
-    const [user, setUser] = useState({
-        fullName: "",
-        email: "",
-        role: "student",
-        createdAt: null,
-    });
-
+const { user, updateUser, logout } = useAuth();
 
     /*
     |--------------------------------------------------------------------------
@@ -112,56 +98,6 @@ const { logout } = useAuth();
 
     const [errorMessage, setErrorMessage] =
         useState("");
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Load User
-    |--------------------------------------------------------------------------
-    */
-
-    useEffect(() => {
-
-        const storedUser =
-            localStorage.getItem("user");
-
-        if (!storedUser) {
-            return;
-        }
-
-        try {
-
-            const parsedUser =
-                JSON.parse(storedUser);
-
-            const userData = {
-                fullName:
-                    parsedUser.fullName || "",
-                email:
-                    parsedUser.email || "",
-                role:
-                    parsedUser.role || "student",
-                createdAt:
-                    parsedUser.createdAt || null,
-            };
-
-            setUser(userData);
-
-            setProfileForm({
-                fullName: userData.fullName,
-                email: userData.email,
-            });
-
-        } catch (error) {
-
-            console.error(
-                "Failed to read user data:",
-                error
-            );
-
-        }
-
-    }, []);
 
 
     /*
@@ -309,7 +245,7 @@ const { logout } = useAuth();
 
 
             const updatedUser =
-                response?.data?.user ||
+                response?.data?.data ||
                 response?.data;
 
 
@@ -325,13 +261,7 @@ const { logout } = useAuth();
             };
 
 
-            setUser(newUser);
-
-
-            localStorage.setItem(
-                "user",
-                JSON.stringify(newUser)
-            );
+            updateUser(newUser);
 
 
             setProfileForm({
@@ -411,10 +341,10 @@ const { logout } = useAuth();
         }
 
 
-        if (newPassword.length < 6) {
+        if (newPassword.length < 8) {
 
             setErrorMessage(
-                "New password must be at least 6 characters."
+                "New password must be at least 8 characters."
             );
 
             return;
@@ -438,7 +368,7 @@ const { logout } = useAuth();
             setPasswordLoading(true);
 
             await changePasswordApi({
-                currentPassword,
+                oldPassword: currentPassword,
                 newPassword,
             });
 
@@ -539,9 +469,9 @@ const { logout } = useAuth();
     const passwordStrength =
         passwordLength === 0
             ? null
-            : passwordLength < 6
+            : passwordLength < 8
                 ? "Weak"
-                : passwordLength < 10
+                : passwordLength < 12
                     ? "Good"
                     : "Strong";
 

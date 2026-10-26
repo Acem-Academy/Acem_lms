@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "seed:admin": "node src/scripts/seedAdmin.js",
     "test:regression": "node tests/regression/run.js",
     "test:h10": "node tests/regression/run.js h10",
     "test:day4": "node tests/regression/run.js day4",
@@ -13,7 +14,10 @@
     "test:visibility": "node tests/regression/run.js visibility",
     "test:learning": "node tests/regression/run.js learning",
     "test:video": "node tests/regression/run.js video",
-    "test:quizattempt": "node tests/regression/run.js quizattempt"
+    "test:quizattempt": "node tests/regression/run.js quizattempt",
+    "test:auth": "node tests/regression/run.js auth",
+    "test:authotp": "node tests/regression/run.js authotp",
+    "test:admin": "node tests/regression/run.js admin"
   },
   "keywords": [],
   "author": "",
@@ -33,6 +37,7 @@
     "morgan": "^1.11.0",
     "multer": "^2.3.0",
     "multer-storage-cloudinary": "^4.0.0",
+    "nodemailer": "^10.1.7",
     "slugify": "^1.6.9",
     "validator": "^13.15.35"
   },
