@@ -1,15 +1,11 @@
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
 import {
   Users as UsersIcon,
   Search,
-  Filter,
   Shield,
   CheckCircle2,
   XCircle,
-  AlertCircle,
-  UserCheck,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -19,6 +15,11 @@ import {
 import { getAdminUsersApi, updateAdminUserApi } from "@/api/admin.api";
 import { useAuth } from "@/context/AuthContext";
 import { ROLES } from "@/config/roles";
+import { TableRowSkeleton } from "@/components/common/Skeletons";
+import ErrorAlert from "@/components/common/ErrorAlert";
+import EmptyState from "@/components/common/EmptyState";
+import ConfirmModal from "@/components/common/ConfirmModal";
+import { showToastSuccess, showToastError } from "@/utils/errorHandler";
 
 const Users = () => {
   const { user: currentUser } = useAuth();
@@ -29,6 +30,16 @@ const Users = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: "",
+    description: "",
+    confirmText: "Confirm",
+    variant: "danger",
+    onConfirm: () => {},
+  });
 
   const handleSearchChange = (e) => {
     const val = e.target.value;
@@ -60,34 +71,41 @@ const Users = () => {
       return res.data;
     },
     onSuccess: (_, variables) => {
-      toast.success(
+      showToastSuccess(
         variables.data.role
           ? "User role updated successfully"
           : "User status updated successfully"
       );
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
+      setConfirmModal((prev) => ({ ...prev, isOpen: false }));
     },
     onError: (err) => {
-      const msg = err.response?.data?.message || err.message || "Failed to update user";
-      toast.error(msg);
+      showToastError(err, "Failed to update user");
+      setConfirmModal((prev) => ({ ...prev, isOpen: false }));
     },
   });
 
   const handleRoleChange = (targetUser, newRole) => {
     if (targetUser._id === currentUser?._id) {
-      toast.error("You cannot change your own role.");
+      showToastError(null, "You cannot change your own role.");
       return;
     }
     if (targetUser.role === newRole) return;
 
-    if (
-      targetUser.role === ROLES.ADMIN &&
-      newRole !== ROLES.ADMIN &&
-      !window.confirm(
-        `Are you sure you want to demote ${targetUser.fullName} from Admin to ${newRole}?`
-      )
-    ) {
+    if (targetUser.role === ROLES.ADMIN && newRole !== ROLES.ADMIN) {
+      setConfirmModal({
+        isOpen: true,
+        title: "Demote Administrator",
+        description: `Are you sure you want to demote ${targetUser.fullName} from Admin to ${newRole}? Make sure another active administrator remains.`,
+        confirmText: "Demote User",
+        variant: "danger",
+        onConfirm: () =>
+          updateUserMutation.mutate({
+            userId: targetUser._id,
+            data: { role: newRole },
+          }),
+      });
       return;
     }
 
@@ -99,17 +117,24 @@ const Users = () => {
 
   const handleStatusChange = (targetUser, newStatus) => {
     if (targetUser._id === currentUser?._id) {
-      toast.error("You cannot deactivate your own account.");
+      showToastError(null, "You cannot deactivate your own account.");
       return;
     }
     if (targetUser.status === newStatus) return;
 
-    if (
-      newStatus === "inactive" &&
-      !window.confirm(
-        `Are you sure you want to deactivate ${targetUser.fullName}'s account?`
-      )
-    ) {
+    if (newStatus === "inactive") {
+      setConfirmModal({
+        isOpen: true,
+        title: "Deactivate User Account",
+        description: `Are you sure you want to deactivate ${targetUser.fullName}'s account? The user will be prevented from logging in.`,
+        confirmText: "Deactivate",
+        variant: "warning",
+        onConfirm: () =>
+          updateUserMutation.mutate({
+            userId: targetUser._id,
+            data: { status: newStatus },
+          }),
+      });
       return;
     }
 
@@ -130,17 +155,18 @@ const Users = () => {
   const users = data?.users || [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages || 1;
+  const isFiltered = Boolean(roleFilter || statusFilter || debouncedSearch);
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-[1600px] px-6 py-8 lg:px-8">
+      <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {/* Header */}
         <section className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-primary)]">
               Admin Panel
             </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-white md:text-4xl">
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl md:text-4xl">
               User Management
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-text-muted)]">
@@ -150,11 +176,12 @@ const Users = () => {
 
           <button
             onClick={() => refetch()}
-            className="inline-flex items-center gap-2 self-start sm:self-auto rounded-xl border border-[var(--color-border)] bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.08]"
+            disabled={isFetching}
+            className="inline-flex items-center gap-2 self-start sm:self-auto rounded-xl border border-[var(--color-border)] bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.08] disabled:opacity-50"
             title="Refresh user list"
           >
             <RefreshCw size={16} className={isFetching ? "animate-spin" : ""} />
-            Refresh
+            {isFetching ? "Refreshing..." : "Refresh"}
           </button>
         </section>
 
@@ -211,7 +238,7 @@ const Users = () => {
 
             {/* Reset */}
             <div className="flex items-center gap-3">
-              {(roleFilter || statusFilter || searchTerm) && (
+              {isFiltered && (
                 <button
                   onClick={resetFilters}
                   className="rounded-xl border border-white/[0.1] bg-white/[0.05] px-4 py-2.5 text-sm font-medium text-neutral-300 transition hover:bg-white/[0.1] hover:text-white"
@@ -226,50 +253,33 @@ const Users = () => {
           </div>
         </section>
 
-        {/* Loading State */}
-        {isLoading && page === 1 && (
-          <div className="mt-8 flex min-h-64 items-center justify-center">
-            <div className="flex items-center gap-3 text-sm text-[var(--color-text-muted)]">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-primary)]" />
-              Loading users...
-            </div>
-          </div>
-        )}
-
-        {/* Error State */}
+        {/* Error State with Retry */}
         {!isLoading && isError && (
-          <div className="mt-8 rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-center">
-            <AlertCircle className="mx-auto h-8 w-8 text-red-400" />
-            <p className="mt-3 font-semibold text-red-300">
-              Failed to load users
-            </p>
-            <p className="mt-1 text-sm text-red-400/80">
-              {error?.message || "An unexpected error occurred."}
-            </p>
-            <button
-              onClick={() => refetch()}
-              className="mt-4 rounded-xl bg-red-500/20 px-4 py-2 text-sm font-medium text-red-200 transition hover:bg-red-500/30"
-            >
-              Try Again
-            </button>
+          <div className="mt-8">
+            <ErrorAlert
+              error={error}
+              title="Failed to load users"
+              onRetry={() => refetch()}
+              retrying={isFetching}
+            />
           </div>
         )}
 
         {/* Users Table */}
-        {!isLoading && !isError && (
+        {!isError && (
           <div className="mt-8 overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)]">
-            {users.length === 0 ? (
-              <div className="p-12 text-center">
-                <UsersIcon className="mx-auto h-12 w-12 text-[var(--color-text-muted)] opacity-50" />
-                <h3 className="mt-4 text-base font-semibold text-white">
-                  No users found
-                </h3>
-                <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-                  {searchTerm || roleFilter || statusFilter
-                    ? "Try adjusting your search terms or filter criteria."
-                    : "No users have been registered yet."}
-                </p>
-              </div>
+            {!isLoading && users.length === 0 ? (
+              <EmptyState
+                icon={UsersIcon}
+                title={isFiltered ? "No users matching filters" : "No users registered"}
+                description={
+                  isFiltered
+                    ? "Try adjusting your search terms or clearing role and status filters."
+                    : "There are currently no users in the database."
+                }
+                secondaryLabel={isFiltered ? "Clear Filters" : undefined}
+                onSecondaryAction={isFiltered ? resetFilters : undefined}
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -284,140 +294,151 @@ const Users = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--color-border)]">
-                    {users.map((targetUser) => {
-                      const isSelf = targetUser._id === currentUser?._id;
-                      const isPending =
-                        updateUserMutation.isPending &&
-                        updateUserMutation.variables?.userId === targetUser._id;
+                    {isLoading && (
+                      <>
+                        <TableRowSkeleton columns={6} />
+                        <TableRowSkeleton columns={6} />
+                        <TableRowSkeleton columns={6} />
+                        <TableRowSkeleton columns={6} />
+                        <TableRowSkeleton columns={6} />
+                      </>
+                    )}
 
-                      return (
-                        <tr
-                          key={targetUser._id}
-                          className="transition hover:bg-white/[0.02]"
-                        >
-                          {/* User info */}
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] font-bold text-white">
-                                {targetUser.fullName?.charAt(0).toUpperCase() || "U"}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-white truncate">
-                                    {targetUser.fullName}
-                                  </span>
-                                  {isSelf && (
-                                    <span className="rounded-md bg-[var(--color-primary)]/10 px-2 py-0.5 text-[10px] font-bold text-[var(--color-primary)]">
-                                      You
-                                    </span>
-                                  )}
+                    {!isLoading &&
+                      users.map((targetUser) => {
+                        const isSelf = targetUser._id === currentUser?._id;
+                        const isPending =
+                          updateUserMutation.isPending &&
+                          updateUserMutation.variables?.userId === targetUser._id;
+
+                        return (
+                          <tr
+                            key={targetUser._id}
+                            className="transition hover:bg-white/[0.02]"
+                          >
+                            {/* User info */}
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] font-bold text-white">
+                                  {targetUser.fullName?.charAt(0).toUpperCase() || "U"}
                                 </div>
-                                <p className="text-xs text-[var(--color-text-muted)] truncate">
-                                  {targetUser.email}
-                                </p>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-white truncate">
+                                      {targetUser.fullName}
+                                    </span>
+                                    {isSelf && (
+                                      <span className="rounded-md bg-[var(--color-primary)]/10 px-2 py-0.5 text-[10px] font-bold text-[var(--color-primary)]">
+                                        You
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-[var(--color-text-muted)] truncate">
+                                    {targetUser.email}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          </td>
+                            </td>
 
-                          {/* Role Selector */}
-                          <td className="px-6 py-4">
-                            {isSelf ? (
-                              <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1 text-xs font-semibold uppercase text-purple-400">
-                                <Shield size={12} />
-                                {targetUser.role}
-                              </span>
-                            ) : (
-                              <select
-                                value={targetUser.role}
-                                onChange={(e) =>
-                                  handleRoleChange(targetUser, e.target.value)
-                                }
-                                disabled={isPending}
-                                className="rounded-xl border border-[var(--color-border)] bg-black px-3 py-1.5 text-xs font-medium text-white focus:border-[var(--color-primary)] focus:outline-none disabled:opacity-50"
-                              >
-                                <option value="admin">Admin</option>
-                                <option value="teacher">Teacher</option>
-                                <option value="student">Student</option>
-                              </select>
-                            )}
-                          </td>
+                            {/* Role Selector */}
+                            <td className="px-6 py-4">
+                              {isSelf ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1 text-xs font-semibold uppercase text-purple-400">
+                                  <Shield size={12} />
+                                  {targetUser.role}
+                                </span>
+                              ) : (
+                                <select
+                                  value={targetUser.role}
+                                  onChange={(e) =>
+                                    handleRoleChange(targetUser, e.target.value)
+                                  }
+                                  disabled={isPending}
+                                  className="rounded-xl border border-[var(--color-border)] bg-black px-3 py-1.5 text-xs font-medium text-white focus:border-[var(--color-primary)] focus:outline-none disabled:opacity-50"
+                                >
+                                  <option value="admin">Admin</option>
+                                  <option value="teacher">Teacher</option>
+                                  <option value="student">Student</option>
+                                </select>
+                              )}
+                            </td>
 
-                          {/* Status Selector */}
-                          <td className="px-6 py-4">
-                            {isSelf ? (
-                              <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">
-                                <CheckCircle2 size={12} />
-                                Active
-                              </span>
-                            ) : (
-                              <select
-                                value={targetUser.status}
-                                onChange={(e) =>
-                                  handleStatusChange(targetUser, e.target.value)
-                                }
-                                disabled={isPending}
-                                className={`rounded-xl border px-3 py-1.5 text-xs font-medium focus:outline-none disabled:opacity-50 ${
-                                  targetUser.status === "active"
-                                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                                    : "border-neutral-700 bg-neutral-900 text-neutral-400"
-                                }`}
-                              >
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                              </select>
-                            )}
-                          </td>
+                            {/* Status Selector */}
+                            <td className="px-6 py-4">
+                              {isSelf ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">
+                                  <CheckCircle2 size={12} />
+                                  Active
+                                </span>
+                              ) : (
+                                <select
+                                  value={targetUser.status}
+                                  onChange={(e) =>
+                                    handleStatusChange(targetUser, e.target.value)
+                                  }
+                                  disabled={isPending}
+                                  className={`rounded-xl border px-3 py-1.5 text-xs font-medium focus:outline-none disabled:opacity-50 ${
+                                    targetUser.status === "active"
+                                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                                      : "border-neutral-700 bg-neutral-900 text-neutral-400"
+                                  }`}
+                                >
+                                  <option value="active">Active</option>
+                                  <option value="inactive">Inactive</option>
+                                </select>
+                              )}
+                            </td>
 
-                          {/* Verified */}
-                          <td className="px-6 py-4">
-                            {targetUser.isEmailVerified ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
-                                <CheckCircle2 size={14} />
-                                Verified
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-400">
-                                <XCircle size={14} />
-                                Unverified
-                              </span>
-                            )}
-                          </td>
+                            {/* Verified */}
+                            <td className="px-6 py-4">
+                              {targetUser.isEmailVerified ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
+                                  <CheckCircle2 size={14} />
+                                  Verified
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-400">
+                                  <XCircle size={14} />
+                                  Unverified
+                                </span>
+                              )}
+                            </td>
 
-                          {/* Joined */}
-                          <td className="px-6 py-4 text-xs text-[var(--color-text-muted)]">
-                            {targetUser.createdAt
-                              ? new Date(targetUser.createdAt).toLocaleDateString()
-                              : "—"}
-                          </td>
+                            {/* Joined */}
+                            <td className="px-6 py-4 text-xs text-[var(--color-text-muted)]">
+                              {targetUser.createdAt
+                                ? new Date(targetUser.createdAt).toLocaleDateString()
+                                : "—"}
+                            </td>
 
-                          {/* Action indicator */}
-                          <td className="px-6 py-4 text-right">
-                            {isPending ? (
-                              <span className="inline-flex items-center gap-1.5 text-xs text-[var(--color-primary)]">
-                                <Loader2 size={14} className="animate-spin" />
-                                Saving...
-                              </span>
-                            ) : isSelf ? (
-                              <span className="text-xs text-[var(--color-text-muted)]">
-                                Protected
-                              </span>
-                            ) : (
-                              <span className="text-xs text-[var(--color-text-muted)]">
-                                Ready
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            {/* Action indicator */}
+                            <td className="px-6 py-4 text-right">
+                              {isPending ? (
+                                <span className="inline-flex items-center gap-1.5 text-xs text-[var(--color-primary)]">
+                                  <Loader2 size={14} className="animate-spin" />
+                                  Saving...
+                                </span>
+                              ) : isSelf ? (
+                                <span className="text-xs text-[var(--color-text-muted)]">
+                                  Protected
+                                </span>
+                              ) : (
+                                <span className="text-xs text-[var(--color-text-muted)]">
+                                  Ready
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>
             )}
 
             {/* Pagination footer */}
-            {totalPages > 1 && (
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-[var(--color-border)] px-6 py-4">
+            {!isLoading && totalPages > 1 && (
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-[var(--color-border)] px-4 py-4 sm:px-6">
                 <p className="text-xs text-[var(--color-text-muted)]">
                   Showing Page <span className="font-semibold text-white">{page}</span>{" "}
                   of <span className="font-semibold text-white">{totalPages}</span> (
@@ -447,6 +468,18 @@ const Users = () => {
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        confirmText={confirmModal.confirmText}
+        variant={confirmModal.variant}
+        isLoading={updateUserMutation.isPending}
+      />
     </div>
   );
 };

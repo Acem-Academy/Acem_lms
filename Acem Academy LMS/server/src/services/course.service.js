@@ -5,6 +5,7 @@ const ROLES = require("../constants/roles");
 
 const {
     COURSE_STATUS,
+    COURSE_VISIBILITY,
 } = require("../constants/course.constants");
 
 const { uploadToCloudinary } = require("../utils/cloudinary");
@@ -68,14 +69,17 @@ const createCourse = async (courseData, file, user) => {
     */
 
     const course = await Course.create({
-        ...courseData,
-
+        title: courseData.title,
+        courseCode: courseData.courseCode,
+        description: courseData.description,
+        price: courseData.price !== undefined ? courseData.price : 0,
+        duration: courseData.duration !== undefined ? courseData.duration : 0,
+        visibility: courseData.visibility || COURSE_VISIBILITY.PUBLIC,
+        status: COURSE_STATUS.DRAFT,
+        isDeleted: false,
         teacher: user._id,
-
         thumbnail,
-
         createdBy: user._id,
-
         updatedBy: user._id,
     });
 

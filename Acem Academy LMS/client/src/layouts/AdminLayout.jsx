@@ -9,7 +9,7 @@ function AdminLayout() {
 
       <Sidebar role={ROLES.ADMIN} />
 
-      <main className="min-h-screen pl-64">
+      <main className="min-h-screen pt-16 lg:pt-0 lg:pl-64">
         <Outlet />
       </main>
 

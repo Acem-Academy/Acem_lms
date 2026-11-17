@@ -31,7 +31,26 @@ const enrollmentIdValidator = [
 
 ];
 
+/*
+|--------------------------------------------------------------------------
+| Lesson Progress (start / complete)
+|--------------------------------------------------------------------------
+*/
+
+const lessonProgressValidator = [
+
+    param("enrollmentId")
+        .isMongoId()
+        .withMessage("Invalid enrollment id."),
+
+    param("lessonId")
+        .isMongoId()
+        .withMessage("Invalid lesson id."),
+
+];
+
 module.exports = {
     enrollStudentValidator,
     enrollmentIdValidator,
+    lessonProgressValidator,
 };

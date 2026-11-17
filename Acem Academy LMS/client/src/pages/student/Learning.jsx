@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useNavigate, useParams, Link as RouterLink } from "react-router-dom";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -47,6 +47,12 @@ import {
 } from "@/api/curriculum.api";
 
 import MathText from "@/components/forms/MathText";
+import ErrorAlert from "@/components/common/ErrorAlert";
+import {
+    getErrorMessage,
+    showToastSuccess,
+    showToastError,
+} from "@/utils/errorHandler";
 
 
 /*
@@ -442,43 +448,24 @@ const Learning = () => {
     |--------------------------------------------------------------------------
     */
 
-    useEffect(() => {
+    const fetchEnrollment = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError("");
 
-        const fetchEnrollment = async () => {
-
-            try {
-
-                setLoading(true);
-                setError("");
-
-                const response =
-                    await getEnrollmentById(enrollmentId);
-
-                setEnrollment(response.data);
-
-            } catch (error) {
-
-                console.error(
-                    "Failed to fetch enrollment:",
-                    error
-                );
-
-                setError(
-                    error?.response?.data?.message ||
-                    "Unable to load your course."
-                );
-
-            } finally {
-
-                setLoading(false);
-
-            }
-
-        };
-
-        fetchEnrollment();
-
+            const response = await getEnrollmentById(enrollmentId);
+            setEnrollment(response.data);
+        } catch (err) {
+            console.error("Failed to fetch enrollment:", err);
+            setError(getErrorMessage(err, "Unable to load your course."));
+        } finally {
+            setLoading(false);
+        }
     }, [enrollmentId]);
+
+    useEffect(() => {
+        fetchEnrollment();
+    }, [fetchEnrollment]);
 
 
     /*
@@ -1070,9 +1057,17 @@ const Learning = () => {
                 totalPoints: result.totalPoints,
                 percentage: result.percentage,
                 passed: result.passed === true,
+                explanations: Array.isArray(result.explanations)
+                    ? result.explanations
+                    : [],
             });
 
             setQuizSubmitted(true);
+            showToastSuccess(
+                result.passed
+                    ? "Quiz passed! Excellent work!"
+                    : "Quiz submitted."
+            );
         } catch (error) {
             console.error("Failed to submit quiz:", error);
 
@@ -1080,21 +1075,18 @@ const Learning = () => {
             const serverMessage =
                 error?.response?.data?.message;
 
+            const finalMsg = status === 403
+                ? (serverMessage || "You have reached the maximum number of attempts for this quiz.")
+                : getErrorMessage(error, "We couldn't submit your quiz. Please check your connection and try again.");
+
             // A 403 means the server refused the submission (e.g. the
             // student has used every allowed attempt). Do not offer a
             // retake in that case; otherwise the request may be retried.
             if (status === 403) {
                 setQuizLimitReached(true);
-                setQuizError(
-                    serverMessage ||
-                    "You have reached the maximum number of attempts for this quiz."
-                );
-            } else {
-                setQuizError(
-                    serverMessage ||
-                    "We couldn't submit your quiz. Please check your connection and try again."
-                );
             }
+            setQuizError(finalMsg);
+            showToastError(finalMsg);
         } finally {
             setQuizSubmitting(false);
         }
@@ -1126,33 +1118,22 @@ const Learning = () => {
 
 
         try {
-
             setActionLoading(true);
 
-            const response =
-                await completeLesson(
-                    enrollment._id,
-                    selectedLesson._id
-                );
+            const response = await completeLesson(
+                enrollment._id,
+                selectedLesson._id
+            );
 
             setEnrollment((previous) =>
-                mergeEnrollment(
-                    previous,
-                    response.data
-                )
+                mergeEnrollment(previous, response.data)
             );
-
+            showToastSuccess("Lesson completed!");
         } catch (error) {
-
-            console.error(
-                "Failed to complete lesson:",
-                error
-            );
-
+            console.error("Failed to complete lesson:", error);
+            showToastError(getErrorMessage(error, "Failed to complete lesson."));
         } finally {
-
             setActionLoading(false);
-
         }
 
     };
@@ -1358,37 +1339,25 @@ const Learning = () => {
     |--------------------------------------------------------------------------
     */
 
-    if (
-        error ||
-        !enrollment
-    ) {
-
+    if (error || !enrollment) {
         return (
-
             <div className="flex min-h-screen items-center justify-center bg-black px-6">
-
-                <div
-                    className="
-                        rounded-xl
-                        border
-                        border-red-900
-                        bg-red-950/30
-                        px-6
-                        py-5
-                        text-sm
-                        text-red-400
-                    "
-                >
-
-                    {error ||
-                        "Enrollment not found."}
-
+                <div className="max-w-md w-full text-center">
+                    <ErrorAlert
+                        message={error || "Enrollment not found."}
+                        onRetry={fetchEnrollment}
+                        className="mb-4"
+                    />
+                    <RouterLink
+                        to="/student/my-learning"
+                        className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-primary)] hover:underline"
+                    >
+                        <ArrowLeft size={16} />
+                        Back to My Learning
+                    </RouterLink>
                 </div>
-
             </div>
-
         );
-
     }
 
 
@@ -1461,6 +1430,7 @@ const Learning = () => {
                     <button
                         type="button"
                         onClick={() => setSidebarOpen(false)}
+                        aria-label="Close curriculum sidebar"
                         className="
                             rounded-lg
                             p-2
@@ -1973,6 +1943,7 @@ const Learning = () => {
                             onClick={() =>
                                 setSidebarOpen(true)
                             }
+                            aria-label="Open curriculum sidebar"
                             className="
                                 rounded-lg
                                 border
@@ -2418,8 +2389,8 @@ const Learning = () => {
                                                 [&_.tiptap-mathematics-render]:align-middle
                                                 [&_.tiptap-mathematics-render[data-type="inline-math"]]:mx-0.5
                                                 [&_.tiptap-mathematics-render[data-type="inline-math"]]:my-1
-                                                text-slate-100
-                                                [&_mark]:!text-slate-900
+                                                text-neutral-100
+                                                [&_mark]:!text-black
                                                 [&_h1]:mb-4 [&_h1]:mt-8 [&_h1]:text-2xl [&_h1]:font-bold
                                                 [&_h2]:mb-3 [&_h2]:mt-7 [&_h2]:text-xl [&_h2]:font-bold
                                                 [&_h3]:mb-3 [&_h3]:mt-6 [&_h3]:text-lg [&_h3]:font-bold
@@ -3026,6 +2997,49 @@ const Learning = () => {
                                                             </button>
                                                         )}
                                                     </div>
+
+                                                    {/* Explanations & Review */}
+                                                    {Array.isArray(quizScore?.explanations) &&
+                                                        quizScore.explanations.some((e) => e?.explanation?.trim()) && (
+                                                            <div className="mt-8 border-t border-[var(--color-border)] pt-8 text-left">
+                                                                <h5 className="mb-4 text-xs font-bold uppercase tracking-wider text-[var(--color-primary)]">
+                                                                    Explanations &amp; Review
+                                                                </h5>
+                                                                <div className="space-y-4">
+                                                                    {quizQuestions.map((q, idx) => {
+                                                                        const expObj = quizScore.explanations.find(
+                                                                            (e) => e.questionIndex === idx
+                                                                        );
+                                                                        const explanationText = expObj?.explanation || "";
+                                                                        if (!explanationText.trim()) return null;
+
+                                                                        return (
+                                                                            <div
+                                                                                key={`review-explanation-${idx}`}
+                                                                                className="rounded-xl border border-[var(--color-border)] bg-black/40 p-4 sm:p-5"
+                                                                            >
+                                                                                <div className="flex items-start gap-3">
+                                                                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary)]/10 text-xs font-bold text-[var(--color-primary)]">
+                                                                                        {idx + 1}
+                                                                                    </span>
+                                                                                    <div className="min-w-0 flex-1">
+                                                                                        <h6 className="text-sm font-semibold text-white">
+                                                                                            <MathText as="span" value={q.question} />
+                                                                                        </h6>
+                                                                                        <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[#121212] p-3 text-sm leading-relaxed text-neutral-300">
+                                                                                            <p className="mb-1 text-xs font-semibold text-[var(--color-primary)]">
+                                                                                                Explanation:
+                                                                                            </p>
+                                                                                            <MathText value={explanationText} />
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </section>

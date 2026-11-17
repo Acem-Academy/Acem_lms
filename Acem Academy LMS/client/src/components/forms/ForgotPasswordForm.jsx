@@ -24,6 +24,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+    showToastSuccess,
+    showToastError,
+} from "@/utils/errorHandler";
 
 function ForgotPasswordForm() {
 
@@ -41,9 +45,6 @@ function ForgotPasswordForm() {
 
     const [cooldown, setCooldown] =
         useState(0);
-
-    const [authError, setAuthError] =
-        useState("");
 
     const [infoMessage, setInfoMessage] =
         useState("");
@@ -89,7 +90,6 @@ function ForgotPasswordForm() {
     const onRequestReset = async (formData) => {
         try {
             setIsSubmitting(true);
-            setAuthError("");
             setInfoMessage("");
 
             await authService.forgotPassword({
@@ -99,12 +99,13 @@ function ForgotPasswordForm() {
             setEmail(formData.email);
             setStep(2);
             setCooldown(60);
-            setInfoMessage(
-                "If an account exists with that email, a password reset code has been sent."
-            );
+            const msg =
+                "If an account exists with that email, a password reset code has been sent.";
+            setInfoMessage(msg);
+            showToastSuccess("Password reset code sent! Please check your email.");
         } catch (error) {
-            setAuthError(
-                error?.response?.data?.message ||
+            showToastError(
+                error,
                 "Unable to request a password reset."
             );
         } finally {
@@ -115,7 +116,7 @@ function ForgotPasswordForm() {
     const onResetPassword = async (formData) => {
         try {
             setIsSubmitting(true);
-            setAuthError("");
+            setInfoMessage("");
 
             await authService.resetPassword({
                 email,
@@ -124,9 +125,10 @@ function ForgotPasswordForm() {
             });
 
             setIsReset(true);
+            showToastSuccess("Password reset successfully! You can now sign in.");
         } catch (error) {
-            setAuthError(
-                error?.response?.data?.message ||
+            showToastError(
+                error,
                 "Unable to reset your password. Please try again."
             );
         } finally {
@@ -137,21 +139,21 @@ function ForgotPasswordForm() {
     const onResend = async () => {
         try {
             setIsResending(true);
-            setAuthError("");
             setInfoMessage("");
 
             await authService.forgotPassword({ email });
 
-            setInfoMessage(
-                "If an account exists with that email, a password reset code has been sent."
-            );
+            const msg =
+                "If an account exists with that email, a password reset code has been sent.";
+            setInfoMessage(msg);
+            showToastSuccess("Reset code resent! Please check your email.");
 
             resetField("otp");
 
             setCooldown(60);
         } catch (error) {
-            setAuthError(
-                error?.response?.data?.message ||
+            showToastError(
+                error,
                 "Unable to resend the reset code."
             );
 
@@ -170,7 +172,6 @@ function ForgotPasswordForm() {
             newPassword: "",
             confirmPassword: "",
         });
-        setAuthError("");
         setInfoMessage("");
         setStep(1);
     };
@@ -344,24 +345,6 @@ function ForgotPasswordForm() {
                                 </p>
                             )}
                         </div>
-
-                        {authError && (
-                            <p
-                                role="alert"
-                                className="
-                                    rounded-xl
-                                    border
-                                    border-red-900
-                                    bg-red-950/30
-                                    px-4
-                                    py-3
-                                    text-sm
-                                    text-red-400
-                                "
-                            >
-                                {authError}
-                            </p>
-                        )}
 
                         <Button
                             type="submit"
@@ -619,24 +602,6 @@ function ForgotPasswordForm() {
                                 </p>
                             )}
                         </div>
-
-                        {authError && (
-                            <p
-                                role="alert"
-                                className="
-                                    rounded-xl
-                                    border
-                                    border-red-900
-                                    bg-red-950/30
-                                    px-4
-                                    py-3
-                                    text-sm
-                                    text-red-400
-                                "
-                            >
-                                {authError}
-                            </p>
-                        )}
 
                         {infoMessage && (
                             <p

@@ -13,8 +13,6 @@ import {
     Eye,
     EyeOff,
     X,
-    CheckCircle2,
-    AlertCircle,
     Loader2,
 } from "lucide-react";
 
@@ -24,6 +22,10 @@ import {
 } from "@/api/auth.api";
 
 import { useAuth } from "@/context/AuthContext";
+import {
+    showToastSuccess,
+    showToastError,
+} from "@/utils/errorHandler";
 
 
 function Profile() {
@@ -85,33 +87,6 @@ const { user, updateUser, logout } = useAuth();
 
     const [logoutLoading, setLogoutLoading] =
         useState(false);
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Messages
-    |--------------------------------------------------------------------------
-    */
-
-    const [successMessage, setSuccessMessage] =
-        useState("");
-
-    const [errorMessage, setErrorMessage] =
-        useState("");
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Clear Messages
-    |--------------------------------------------------------------------------
-    */
-
-    const clearMessages = () => {
-
-        setSuccessMessage("");
-        setErrorMessage("");
-
-    };
 
 
     /*
@@ -203,51 +178,29 @@ const { user, updateUser, logout } = useAuth();
     */
 
     const handleUpdateProfile = async (event) => {
-
         event.preventDefault();
 
-        clearMessages();
-
-
         if (profileForm.fullName.trim().length < 3) {
-
-            setErrorMessage(
-                "Full name must be at least 3 characters."
-            );
-
+            showToastError(null, "Full name must be at least 3 characters.");
             return;
-
         }
-
 
         if (!profileForm.email.trim()) {
-
-            setErrorMessage(
-                "Email address is required."
-            );
-
+            showToastError(null, "Email address is required.");
             return;
-
         }
 
-
         try {
-
             setProfileLoading(true);
 
-            const response =
-                await updateProfileApi({
-                    fullName:
-                        profileForm.fullName.trim(),
-                    email:
-                        profileForm.email.trim(),
-                });
-
+            const response = await updateProfileApi({
+                fullName: profileForm.fullName.trim(),
+                email: profileForm.email.trim(),
+            });
 
             const updatedUser =
                 response?.data?.data ||
                 response?.data;
-
 
             const newUser = {
                 ...user,
@@ -260,44 +213,22 @@ const { user, updateUser, logout } = useAuth();
                     profileForm.email.trim(),
             };
 
-
             updateUser(newUser);
 
-
             setProfileForm({
-                fullName:
-                    newUser.fullName,
-                email:
-                    newUser.email,
+                fullName: newUser.fullName,
+                email: newUser.email,
             });
 
-
             setIsEditing(false);
-
-            setSuccessMessage(
-                "Profile updated successfully."
-            );
-
+            showToastSuccess("Profile updated successfully.");
         } catch (error) {
-
-            console.error(
-                "Profile update failed:",
-                error
-            );
-
-            setErrorMessage(
-                error?.response?.data?.message ||
-                "Failed to update profile."
-            );
-
+            console.error("Profile update failed:", error);
+            showToastError(error, "Failed to update profile.");
         } finally {
-
             setProfileLoading(false);
-
         }
-
     };
-
 
     /*
     |--------------------------------------------------------------------------
@@ -306,11 +237,7 @@ const { user, updateUser, logout } = useAuth();
     */
 
     const handleChangePassword = async (event) => {
-
         event.preventDefault();
-
-        clearMessages();
-
 
         const {
             currentPassword,
@@ -318,53 +245,27 @@ const { user, updateUser, logout } = useAuth();
             confirmPassword,
         } = passwordForm;
 
-
         if (!currentPassword) {
-
-            setErrorMessage(
-                "Current password is required."
-            );
-
+            showToastError(null, "Current password is required.");
             return;
-
         }
-
 
         if (!newPassword) {
-
-            setErrorMessage(
-                "New password is required."
-            );
-
+            showToastError(null, "New password is required.");
             return;
-
         }
-
 
         if (newPassword.length < 8) {
-
-            setErrorMessage(
-                "New password must be at least 8 characters."
-            );
-
+            showToastError(null, "New password must be at least 8 characters.");
             return;
-
         }
-
 
         if (newPassword !== confirmPassword) {
-
-            setErrorMessage(
-                "New passwords do not match."
-            );
-
+            showToastError(null, "New passwords do not match.");
             return;
-
         }
 
-
         try {
-
             setPasswordLoading(true);
 
             await changePasswordApi({
@@ -372,40 +273,21 @@ const { user, updateUser, logout } = useAuth();
                 newPassword,
             });
 
-
             setPasswordForm({
                 currentPassword: "",
                 newPassword: "",
                 confirmPassword: "",
             });
 
-
             setShowPasswordForm(false);
-
-            setSuccessMessage(
-                "Password changed successfully."
-            );
-
+            showToastSuccess("Password changed successfully.");
         } catch (error) {
-
-            console.error(
-                "Password change failed:",
-                error
-            );
-
-            setErrorMessage(
-                error?.response?.data?.message ||
-                "Failed to change password."
-            );
-
+            console.error("Password change failed:", error);
+            showToastError(error, "Failed to change password.");
         } finally {
-
             setPasswordLoading(false);
-
         }
-
     };
-
 
     /*
     |--------------------------------------------------------------------------
@@ -414,29 +296,19 @@ const { user, updateUser, logout } = useAuth();
     */
 
     const handleLogout = async () => {
-    try {
-
-        setLogoutLoading(true);
-
-        await logout();
-
-        navigate("/login", {
-            replace: true,
-        });
-
-    } catch (error) {
-
-        console.error(
-            "Logout failed:",
-            error
-        );
-
-    } finally {
-
-        setLogoutLoading(false);
-
-    }
-};
+        try {
+            setLogoutLoading(true);
+            await logout();
+            navigate("/login", {
+                replace: true,
+            });
+        } catch (error) {
+            console.error("Logout failed:", error);
+            showToastError(error, "Logout failed.");
+        } finally {
+            setLogoutLoading(false);
+        }
+    };
 
     /*
     |--------------------------------------------------------------------------
@@ -499,7 +371,7 @@ const { user, updateUser, logout } = useAuth();
                 "
             >
 
-                <div className="mx-auto max-w-5xl px-6 py-10">
+                <div className="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-10">
 
                     <p
                         className="
@@ -516,7 +388,8 @@ const { user, updateUser, logout } = useAuth();
                     <h1
                         className="
                             mt-2
-                            text-3xl
+                            text-2xl
+                            sm:text-3xl
                             font-bold
                             tracking-tight
                             text-white
@@ -549,78 +422,12 @@ const { user, updateUser, logout } = useAuth();
                 className="
                     mx-auto
                     max-w-5xl
-                    px-6
-                    py-10
+                    px-4
+                    sm:px-6
+                    py-8
+                    sm:py-10
                 "
             >
-
-
-                {/* ====================================================== */}
-                {/* Messages */}
-                {/* ====================================================== */}
-
-                {successMessage && (
-
-                    <div
-                        className="
-                            mb-6
-                            flex
-                            items-center
-                            gap-3
-                            rounded-xl
-                            border
-                            border-[var(--color-primary)]/30
-                            bg-[var(--color-primary)]/10
-                            px-4
-                            py-3
-                            text-sm
-                            text-[var(--color-primary)]
-                        "
-                    >
-
-                        <CheckCircle2
-                            size={18}
-                        />
-
-                        <span>
-                            {successMessage}
-                        </span>
-
-                    </div>
-
-                )}
-
-
-                {errorMessage && (
-
-                    <div
-                        className="
-                            mb-6
-                            flex
-                            items-center
-                            gap-3
-                            rounded-xl
-                            border
-                            border-red-900
-                            bg-red-950/30
-                            px-4
-                            py-3
-                            text-sm
-                            text-red-400
-                        "
-                    >
-
-                        <AlertCircle
-                            size={18}
-                        />
-
-                        <span>
-                            {errorMessage}
-                        </span>
-
-                    </div>
-
-                )}
 
 
                 {/* ====================================================== */}

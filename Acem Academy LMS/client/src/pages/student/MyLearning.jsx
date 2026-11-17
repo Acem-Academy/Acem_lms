@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
     BookOpen,
     Clock3,
     PlayCircle,
     CheckCircle2,
-    Loader2,
     ArrowRight,
     Trophy,
     GraduationCap,
@@ -12,6 +11,10 @@ import {
 import { Link } from "react-router-dom";
 
 import { getMyCourses } from "@/api/enrollment.api";
+import { StatCardSkeleton, CourseCardSkeleton } from "@/components/common/Skeletons";
+import ErrorAlert from "@/components/common/ErrorAlert";
+import EmptyState from "@/components/common/EmptyState";
+import { getErrorMessage } from "@/utils/errorHandler";
 
 const MyLearning = () => {
 
@@ -26,44 +29,24 @@ const MyLearning = () => {
     |--------------------------------------------------------------------------
     */
 
-    useEffect(() => {
+    const fetchMyCourses = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError("");
 
-        const fetchMyCourses = async () => {
-
-            try {
-
-                setLoading(true);
-                setError("");
-
-                const response = await getMyCourses();
-
-                setEnrollments(
-                    response.data || []
-                );
-
-            } catch (error) {
-
-                console.error(
-                    "Failed to fetch my courses:",
-                    error
-                );
-
-                setError(
-                    error?.response?.data?.message ||
-                    "Unable to load your courses."
-                );
-
-            } finally {
-
-                setLoading(false);
-
-            }
-
-        };
-
-        fetchMyCourses();
-
+            const response = await getMyCourses();
+            setEnrollments(response.data || []);
+        } catch (err) {
+            console.error("Failed to fetch my courses:", err);
+            setError(getErrorMessage(err, "Unable to load your courses."));
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        fetchMyCourses();
+    }, [fetchMyCourses]);
 
 
     /*
@@ -141,68 +124,52 @@ const MyLearning = () => {
 
     /*
     |--------------------------------------------------------------------------
-    | Loading
+    | Loading State
     |--------------------------------------------------------------------------
     */
 
     if (loading) {
-
         return (
-
-            <div className="flex min-h-screen items-center justify-center bg-black">
-
-                <div className="flex items-center gap-3 text-sm text-white">
-
-                    <Loader2
-                        size={19}
-                        className="animate-spin text-[var(--color-primary)]"
-                    />
-
-                    Loading your learning...
-
-                </div>
-
+            <div className="min-h-screen bg-black text-white">
+                <section className="border-b border-[var(--color-border)] bg-black px-6 py-12 md:py-16">
+                    <div className="mx-auto max-w-7xl animate-pulse">
+                        <div className="h-6 w-32 rounded bg-[var(--color-surface)]" />
+                        <div className="mt-4 h-10 w-72 rounded bg-[var(--color-surface)]" />
+                        <div className="mt-4 h-4 w-96 rounded bg-[var(--color-surface)]" />
+                    </div>
+                </section>
+                <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-10">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {[1, 2, 3, 4].map((i) => (
+                            <StatCardSkeleton key={i} />
+                        ))}
+                    </div>
+                    <div className="mt-12">
+                        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                            {[1, 2, 3].map((i) => (
+                                <CourseCardSkeleton key={i} />
+                            ))}
+                        </div>
+                    </div>
+                </main>
             </div>
-
         );
-
     }
-
 
     /*
     |--------------------------------------------------------------------------
-    | Error
+    | Error State
     |--------------------------------------------------------------------------
     */
 
     if (error) {
-
         return (
-
             <div className="min-h-screen bg-black px-6 py-12">
-
                 <div className="mx-auto max-w-7xl">
-
-                    <div
-                        className="
-                            rounded-2xl
-                            border
-                            border-red-900
-                            bg-red-950/30
-                            p-6
-                            text-sm
-                            text-red-400
-                        "
-                    >
-                        {error}
-                    </div>
-
+                    <ErrorAlert message={error} onRetry={fetchMyCourses} />
                 </div>
-
             </div>
-
         );
-
     }
 
 
@@ -262,7 +229,7 @@ const MyLearning = () => {
                 />
 
 
-                <div className="relative mx-auto max-w-7xl px-6 py-12 md:py-16">
+                <div className="relative mx-auto max-w-7xl px-4 sm:px-6 py-8 sm:py-12 md:py-16">
 
                     <div className="max-w-3xl">
 
@@ -305,7 +272,8 @@ const MyLearning = () => {
                         <h1
                             className="
                                 mt-5
-                                text-4xl
+                                text-2xl
+                                sm:text-4xl
                                 font-bold
                                 tracking-tight
                                 text-white
@@ -345,7 +313,7 @@ const MyLearning = () => {
             {/* Main */}
             {/* ========================================================== */}
 
-            <main className="mx-auto max-w-7xl px-6 py-10">
+            <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-10">
 
 
                 {/* ====================================================== */}
@@ -353,95 +321,14 @@ const MyLearning = () => {
                 {/* ====================================================== */}
 
                 {enrollments.length === 0 ? (
-
-                    <div
-                        className="
-                            overflow-hidden
-                            rounded-2xl
-                            border
-                            border-[var(--color-border)]
-                            bg-[var(--color-surface)]
-                            px-6
-                            py-16
-                            text-center
-                        "
-                    >
-
-                        <div
-                            className="
-                                mx-auto
-                                flex
-                                h-16
-                                w-16
-                                items-center
-                                justify-center
-                                rounded-2xl
-                                bg-[var(--color-primary)]/10
-                            "
-                        >
-
-                            <BookOpen
-                                size={28}
-                                className="text-[var(--color-primary)]"
-                            />
-
-                        </div>
-
-
-                        <h2
-                            className="
-                                mt-6
-                                text-2xl
-                                font-bold
-                                text-white
-                            "
-                        >
-                            You haven't enrolled in any courses yet
-                        </h2>
-
-
-                        <p
-                            className="
-                                mx-auto
-                                mt-3
-                                max-w-md
-                                text-sm
-                                leading-6
-                                text-[var(--color-text-muted)]
-                            "
-                        >
-                            Explore our courses and start learning
-                            something new today.
-                        </p>
-
-
-                        <Link
-                            to="/student/courses"
-                            className="
-                                mt-7
-                                inline-flex
-                                items-center
-                                gap-2
-                                rounded-xl
-                                bg-[var(--color-primary)]
-                                px-6
-                                py-3
-                                text-sm
-                                font-bold
-                                text-black
-                                transition
-                                hover:bg-[var(--color-primary-dark)]
-                            "
-                        >
-
-                            Explore Courses
-
-                            <ArrowRight size={17} />
-
-                        </Link>
-
-                    </div>
-
+                    <EmptyState
+                        title="You haven't enrolled in any courses yet"
+                        description="Explore our course catalog and enroll to start learning and tracking your progress."
+                        action={{
+                            label: "Explore Courses",
+                            href: "/student/courses",
+                        }}
+                    />
                 ) : (
 
                     <>

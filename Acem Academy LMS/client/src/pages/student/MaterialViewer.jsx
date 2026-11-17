@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
@@ -15,6 +15,8 @@ import {
     RotateCcw,
 } from "lucide-react";
 import axiosInstance from "@/api/axios";
+import ErrorAlert from "@/components/common/ErrorAlert";
+import { getErrorMessage } from "@/utils/errorHandler";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
     "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -38,49 +40,34 @@ const MaterialViewer = () => {
     const [pageNumber, setPageNumber] = useState(1);
     const [scale, setScale] = useState(1);
 
+    const fetchLesson = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError("");
+
+            const response = await axiosInstance.get(
+                `/lessons/${lessonId}`
+            );
+
+            const lessonData =
+                response?.data?.data ||
+                response?.data?.lesson ||
+                response?.data;
+
+            setLesson(lessonData);
+        } catch (err) {
+            console.error("Failed to fetch lesson material:", err);
+            setError(getErrorMessage(err, "Unable to load this course material."));
+        } finally {
+            setLoading(false);
+        }
+    }, [lessonId]);
+
     useEffect(() => {
-        const fetchLesson = async () => {
-            try {
-                setLoading(true);
-                setError("");
-
-                const response = await axiosInstance.get(
-                    `/lessons/${lessonId}`
-                );
-
-                /*
-                |------------------------------------------------------------------
-                | API Response
-                |------------------------------------------------------------------
-                |
-                | ApiResponse wraps the actual lesson inside `data`.
-                | Keep a small fallback here so the viewer remains compatible
-                | if the response is returned without the wrapper.
-                |
-                */
-
-                const lessonData =
-                    response?.data?.data ||
-                    response?.data?.lesson ||
-                    response?.data;
-
-                setLesson(lessonData);
-            } catch (err) {
-                console.error("Failed to fetch lesson material:", err);
-
-                setError(
-                    err?.response?.data?.message ||
-                        "Unable to load this course material."
-                );
-            } finally {
-                setLoading(false);
-            }
-        };
-
         if (lessonId) {
             fetchLesson();
         }
-    }, [lessonId]);
+    }, [lessonId, fetchLesson]);
 
     const attachment = useMemo(() => {
         return lesson?.attachments?.[attachmentIndex] || null;
@@ -132,33 +119,42 @@ const MaterialViewer = () => {
     if (error || !lesson || !attachment?.url) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-black px-6 text-white">
-                <div className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-7 text-center">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-primary)]/10">
-                        <FileText
-                            size={23}
-                            className="text-[var(--color-primary)]"
+                <div className="w-full max-w-md">
+                    {error ? (
+                        <ErrorAlert
+                            message={error}
+                            onRetry={fetchLesson}
+                            className="mb-4"
                         />
+                    ) : (
+                        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-7 text-center mb-4">
+                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-primary)]/10">
+                                <FileText
+                                    size={23}
+                                    className="text-[var(--color-primary)]"
+                                />
+                            </div>
+                            <h1 className="mt-5 text-lg font-bold">
+                                Material unavailable
+                            </h1>
+                            <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">
+                                This course attachment is missing or has an invalid URL.
+                            </p>
+                        </div>
+                    )}
+                    <div className="text-center">
+                        <Link
+                            to={
+                                enrollmentId
+                                    ? `/student/learning/${enrollmentId}`
+                                    : "/student/my-learning"
+                            }
+                            className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-bold text-black transition hover:bg-[var(--color-primary-dark)]"
+                        >
+                            <ArrowLeft size={16} />
+                            Back to Lesson
+                        </Link>
                     </div>
-
-                    <h1 className="mt-5 text-lg font-bold">
-                        Material unavailable
-                    </h1>
-
-                    <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">
-                        {error || "This material could not be found."}
-                    </p>
-
-                    <Link
-                        to={
-                            enrollmentId
-                                ? `/student/learning/${enrollmentId}`
-                                : "/student/my-learning"
-                        }
-                        className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-bold text-black transition hover:bg-[var(--color-primary-dark)]"
-                    >
-                        <ArrowLeft size={16} />
-                        Back to Lesson
-                    </Link>
                 </div>
             </div>
         );
@@ -196,24 +192,24 @@ const MaterialViewer = () => {
                 {isPdf ? (
                     <div className="flex h-full min-h-0 flex-col">
                         {/* Toolbar */}
-                        <div className="flex shrink-0 items-center justify-center border-b border-[var(--color-border)] bg-[#111111] px-4 py-3">
-                            <div className="flex items-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-black p-1">
+                        <div className="relative flex shrink-0 items-center justify-between gap-2 border-b border-[var(--color-border)] bg-[#111111] px-3 py-2 sm:justify-center sm:px-4 sm:py-3">
+                            <div className="flex items-center gap-1 sm:gap-1.5 rounded-xl border border-[var(--color-border)] bg-black p-1">
                                 <button
                                     type="button"
                                     onClick={zoomOut}
                                     disabled={scale <= 0.6}
-                                    className="rounded-lg p-2 text-[var(--color-text-muted)] transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                    className="rounded-lg p-1.5 sm:p-2 text-[var(--color-text-muted)] transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
                                     aria-label="Zoom out"
                                 >
-                                    <Minus size={17} />
+                                    <Minus size={16} />
                                 </button>
 
                                 <button
                                     type="button"
                                     onClick={resetZoom}
-                                    className="flex min-w-16 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold text-white transition hover:bg-white/5"
+                                    className="flex min-w-14 sm:min-w-16 items-center justify-center gap-1 rounded-lg px-1.5 py-1.5 sm:px-2 sm:py-2 text-xs font-semibold text-white transition hover:bg-white/5"
                                 >
-                                    <RotateCcw size={14} />
+                                    <RotateCcw size={13} />
                                     {Math.round(scale * 100)}%
                                 </button>
 
@@ -221,72 +217,72 @@ const MaterialViewer = () => {
                                     type="button"
                                     onClick={zoomIn}
                                     disabled={scale >= 1.8}
-                                    className="rounded-lg p-2 text-[var(--color-text-muted)] transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                    className="rounded-lg p-1.5 sm:p-2 text-[var(--color-text-muted)] transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
                                     aria-label="Zoom in"
                                 >
-                                    <Plus size={17} />
+                                    <Plus size={16} />
                                 </button>
                             </div>
 
-                          {numPages > 0 && (
-    <div className="absolute right-4 hidden items-center gap-2 text-xs text-[var(--color-text-muted)] sm:flex">
+                            {numPages > 0 && (
+                                <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] sm:absolute sm:right-4 sm:gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handlePrevious}
+                                        disabled={pageNumber <= 1}
+                                        aria-label="Previous page"
+                                        className="
+                                            inline-flex items-center gap-1
+                                            rounded-lg
+                                            border border-[var(--color-border)]
+                                            bg-[var(--color-surface)]
+                                            px-2.5 py-1.5 sm:px-4 sm:py-2
+                                            text-xs sm:text-sm font-medium
+                                            text-white
+                                            transition-all duration-200
+                                            hover:border-[var(--color-primary)]
+                                            hover:bg-[var(--color-primary)]
+                                            hover:text-black
+                                            disabled:cursor-not-allowed
+                                            disabled:opacity-35
+                                            disabled:hover:border-[var(--color-border)]
+                                            disabled:hover:bg-[var(--color-surface)]
+                                            disabled:hover:text-white
+                                        "
+                                    >
+                                        <ChevronLeft size={16} />
+                                        <span className="hidden xs:inline sm:inline">Prev</span>
+                                    </button>
 
-        <button
-            type="button"
-            onClick={handlePrevious}
-            disabled={pageNumber <= 1}
-            className="
-                inline-flex items-center gap-2
-                rounded-lg
-                border border-[var(--color-border)]
-                bg-[var(--color-surface)]
-                px-4 py-2.5
-                text-sm font-medium
-                text-white
-                transition-all duration-200
-                hover:border-[var(--color-primary)]
-                hover:bg-[var(--color-primary)]
-                hover:text-black
-                disabled:cursor-not-allowed
-                disabled:opacity-35
-                disabled:hover:border-[var(--color-border)]
-                disabled:hover:bg-[var(--color-surface)]
-                disabled:hover:text-white
-            "
-        >
-            <ChevronLeft size={17} />
-            <span>Previous</span>
-        </button>
+                                    <span className="min-w-12 sm:min-w-20 text-center font-medium">
+                                        {pageNumber} / {numPages}
+                                    </span>
 
-        <span className="min-w-20 text-center">
-            {pageNumber} / {numPages}
-        </span>
-
-        <button
-            type="button"
-            onClick={handleNext}
-            disabled={pageNumber >= numPages}
-            className="
-                inline-flex items-center gap-2
-                rounded-lg
-                border border-[var(--color-primary)]
-                bg-[var(--color-primary)]
-                px-4 py-2.5
-                text-sm font-semibold
-                text-black
-                transition-all duration-200
-                hover:brightness-95
-                disabled:cursor-not-allowed
-                disabled:opacity-35
-                disabled:hover:brightness-100
-            "
-        >
-            <span>Next</span>
-            <ChevronRight size={17} />
-        </button>
-
-    </div>
-)}
+                                    <button
+                                        type="button"
+                                        onClick={handleNext}
+                                        disabled={pageNumber >= numPages}
+                                        aria-label="Next page"
+                                        className="
+                                            inline-flex items-center gap-1
+                                            rounded-lg
+                                            border border-[var(--color-primary)]
+                                            bg-[var(--color-primary)]
+                                            px-2.5 py-1.5 sm:px-4 sm:py-2
+                                            text-xs sm:text-sm font-semibold
+                                            text-black
+                                            transition-all duration-200
+                                            hover:brightness-95
+                                            disabled:cursor-not-allowed
+                                            disabled:opacity-35
+                                            disabled:hover:brightness-100
+                                        "
+                                    >
+                                        <span className="hidden xs:inline sm:inline">Next</span>
+                                        <ChevronRight size={16} />
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* PDF canvas */}

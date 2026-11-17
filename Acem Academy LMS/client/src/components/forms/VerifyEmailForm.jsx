@@ -26,6 +26,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+    showToastSuccess,
+    showToastError,
+} from "@/utils/errorHandler";
 
 function VerifyEmailForm() {
 
@@ -41,9 +45,6 @@ function VerifyEmailForm() {
 
     const [cooldown, setCooldown] =
         useState(0);
-
-    const [authError, setAuthError] =
-        useState("");
 
     const [infoMessage, setInfoMessage] =
         useState("");
@@ -80,7 +81,6 @@ function VerifyEmailForm() {
     const onSubmit = async (formData) => {
         try {
             setIsSubmitting(true);
-            setAuthError("");
             setInfoMessage("");
 
             await authService.verifyEmail({
@@ -89,9 +89,10 @@ function VerifyEmailForm() {
             });
 
             setIsVerified(true);
+            showToastSuccess("Email verified successfully! You can now sign in.");
         } catch (error) {
-            setAuthError(
-                error?.response?.data?.message ||
+            showToastError(
+                error,
                 "Unable to verify your email. Please try again."
             );
         } finally {
@@ -103,34 +104,27 @@ function VerifyEmailForm() {
         const email = getValues("email");
 
         if (!email) {
-            setAuthError(
-                "Enter your email address first."
-            );
-
+            showToastError(null, "Enter your email address first.");
             return;
         }
 
         try {
             setIsResending(true);
-            setAuthError("");
             setInfoMessage("");
 
-            const response =
-                await authService.resendVerification({
-                    email,
-                });
+            const response = await authService.resendVerification({ email });
 
-            setInfoMessage(
+            const msg =
                 response?.message ||
-                "If an unverified account exists, a new verification code has been sent."
-            );
+                "If an unverified account exists, a new verification code has been sent.";
+            setInfoMessage(msg);
+            showToastSuccess("Verification code sent! Please check your email.");
 
             resetField("otp");
-
             setCooldown(60);
         } catch (error) {
-            setAuthError(
-                error?.response?.data?.message ||
+            showToastError(
+                error,
                 "Unable to resend the verification code."
             );
 
@@ -352,24 +346,6 @@ function VerifyEmailForm() {
                             </p>
                         )}
                     </div>
-
-                    {authError && (
-                        <p
-                            role="alert"
-                            className="
-                                rounded-xl
-                                border
-                                border-red-900
-                                bg-red-950/30
-                                px-4
-                                py-3
-                                text-sm
-                                text-red-400
-                            "
-                        >
-                            {authError}
-                        </p>
-                    )}
 
                     {infoMessage && (
                         <p

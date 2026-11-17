@@ -24,6 +24,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+    showToastSuccess,
+    showToastError,
+    showToastWarning,
+} from "@/utils/errorHandler";
 
 function LoginForm() {
 
@@ -35,9 +40,6 @@ function LoginForm() {
 
     const [isSubmitting, setIsSubmitting] =
         useState(false);
-
-    const [authError, setAuthError] =
-        useState("");
 
     const {
         register,
@@ -57,103 +59,56 @@ function LoginForm() {
         try {
 
             setIsSubmitting(true);
-            setAuthError("");
 
             const loggedInUser =
                 await login(formData);
 
             if (!loggedInUser) {
-
-                setAuthError(
-                    "Unable to load your profile. Please try again."
-                );
-
+                showToastError(null, "Unable to load your profile. Please try again.");
                 return;
-
             }
 
             switch (loggedInUser.role) {
-
                 case ROLES.ADMIN:
-
-                    navigate(
-                        ROUTES.ADMIN.DASHBOARD,
-                        {
-                            replace: true,
-                        }
-                    );
-
+                    showToastSuccess(`Welcome back, ${loggedInUser.fullName || "Admin"}!`);
+                    navigate(ROUTES.ADMIN.DASHBOARD, { replace: true });
                     break;
-
 
                 case ROLES.TEACHER:
-
-                    navigate(
-                        ROUTES.TEACHER.DASHBOARD,
-                        {
-                            replace: true,
-                        }
-                    );
-
+                    showToastSuccess(`Welcome back, ${loggedInUser.fullName || "Teacher"}!`);
+                    navigate(ROUTES.TEACHER.DASHBOARD, { replace: true });
                     break;
-
 
                 case ROLES.STUDENT:
-
-                    navigate(
-                        ROUTES.STUDENT.DASHBOARD,
-                        {
-                            replace: true,
-                        }
-                    );
-
+                    showToastSuccess(`Welcome back, ${loggedInUser.fullName || "Student"}!`);
+                    navigate(ROUTES.STUDENT.DASHBOARD, { replace: true });
                     break;
 
-
                 default:
-
-                    navigate(
-                        ROUTES.LOGIN,
-                        {
-                            replace: true,
-                        }
-                    );
-
+                    navigate(ROUTES.LOGIN, { replace: true });
             }
-
         } catch (error) {
-
             console.error(error);
 
-            const message =
-                error?.response?.data?.message ||
-                "Unable to sign in. Please try again.";
-
-            const errors =
-                error?.response?.data?.errors;
+            const errors = error?.response?.data?.errors;
 
             if (
                 error?.response?.status === 403 &&
                 Array.isArray(errors) &&
                 errors.includes("EMAIL_NOT_VERIFIED")
             ) {
-
+                showToastWarning("Please verify your email address to sign in.");
                 navigate(
                     `${ROUTES.VERIFY_EMAIL}?email=${encodeURIComponent(
                         formData.email
                     )}`
                 );
-
                 return;
-
             }
 
-            setAuthError(message);
-
+            showToastError(error, "Unable to sign in. Please try again.");
         } finally {
-
             setIsSubmitting(false);
-
         }
 
     };
@@ -382,27 +337,6 @@ function LoginForm() {
                         )}
 
                     </div>
-
-
-                    {authError && (
-
-                        <p
-                            role="alert"
-                            className="
-                                rounded-xl
-                                border
-                                border-red-900
-                                bg-red-950/30
-                                px-4
-                                py-3
-                                text-sm
-                                text-red-400
-                            "
-                        >
-                            {authError}
-                        </p>
-
-                    )}
 
 
                     {/* ================================================== */}

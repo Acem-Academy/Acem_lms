@@ -22,6 +22,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+    showToastSuccess,
+    showToastError,
+} from "@/utils/errorHandler";
 
 function RegisterForm() {
 
@@ -36,9 +40,6 @@ function RegisterForm() {
 
     const [isSubmitting, setIsSubmitting] =
         useState(false);
-
-    const [authError, setAuthError] =
-        useState("");
 
     const {
         register,
@@ -57,18 +58,16 @@ function RegisterForm() {
     */
 
     const onSubmit = async (formData) => {
-
         try {
-
             setIsSubmitting(true);
-            setAuthError("");
 
-            const {
-                confirmPassword,
-                ...registerData
-            } = formData;
+            const { confirmPassword, ...registerData } = formData;
 
             await registerUser(registerData);
+
+            showToastSuccess(
+                "Account created! Please check your email for the verification code."
+            );
 
             navigate(
                 `${ROUTES.VERIFY_EMAIL}?email=${encodeURIComponent(
@@ -78,22 +77,15 @@ function RegisterForm() {
                     replace: true,
                 }
             );
-
         } catch (error) {
-
             console.error(error);
-
-            setAuthError(
-                error?.response?.data?.message ||
-                "Registration failed"
+            showToastError(
+                error,
+                "Registration failed. Please check your information and try again."
             );
-
         } finally {
-
             setIsSubmitting(false);
-
         }
-
     };
 
 
@@ -458,27 +450,6 @@ function RegisterForm() {
                         )}
 
                     </div>
-
-
-                    {authError && (
-
-                        <p
-                            role="alert"
-                            className="
-                                rounded-xl
-                                border
-                                border-red-900
-                                bg-red-950/30
-                                px-4
-                                py-3
-                                text-sm
-                                text-red-400
-                            "
-                        >
-                            {authError}
-                        </p>
-
-                    )}
 
 
                     {/* ================================================== */}

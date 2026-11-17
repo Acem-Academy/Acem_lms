@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
     BookOpen,
@@ -11,21 +11,28 @@ import {
     PlayCircle,
     GraduationCap,
     Layers3,
+    Loader2,
 } from "lucide-react";
 
 import { getCourseById } from "@/api/course.api";
-
 import {
     getSubCourses,
     getChapters,
     getTopics,
     getLessons,
 } from "@/api/curriculum.api";
-
 import {
     enrollInCourse,
     getMyCourses,
 } from "@/api/enrollment.api";
+
+import ErrorAlert from "@/components/common/ErrorAlert";
+import EmptyState from "@/components/common/EmptyState";
+import {
+    getErrorMessage,
+    showToastSuccess,
+    showToastError,
+} from "@/utils/errorHandler";
 
 const CourseDetails = () => {
 
@@ -54,7 +61,6 @@ const CourseDetails = () => {
     const [openTopics, setOpenTopics] = useState({});
 
     const [enrolling, setEnrolling] = useState(false);
-    const [enrollError, setEnrollError] = useState("");
     const [enrolled, setEnrolled] = useState(false);
 
     const [checkingEnrollment, setCheckingEnrollment] =
@@ -67,43 +73,24 @@ const CourseDetails = () => {
     |--------------------------------------------------------------------------
     */
 
-    useEffect(() => {
+    const fetchCourse = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError("");
 
-        const fetchCourse = async () => {
-
-            try {
-
-                setLoading(true);
-                setError("");
-
-                const response =
-                    await getCourseById(courseId);
-
-                setCourse(response.data);
-
-            } catch (error) {
-
-                console.error(
-                    "Failed to fetch course:",
-                    error
-                );
-
-                setError(
-                    error?.response?.data?.message ||
-                    "Unable to load this course."
-                );
-
-            } finally {
-
-                setLoading(false);
-
-            }
-
-        };
-
-        fetchCourse();
-
+            const response = await getCourseById(courseId);
+            setCourse(response.data);
+        } catch (err) {
+            console.error("Failed to fetch course:", err);
+            setError(getErrorMessage(err, "Unable to load this course."));
+        } finally {
+            setLoading(false);
+        }
     }, [courseId]);
+
+    useEffect(() => {
+        fetchCourse();
+    }, [fetchCourse]);
 
 
     /*
@@ -381,34 +368,19 @@ const CourseDetails = () => {
     */
 
     const handleEnroll = async () => {
-
         try {
-
             setEnrolling(true);
-            setEnrollError("");
 
             await enrollInCourse(course._id);
 
             setEnrolled(true);
-
-        } catch (error) {
-
-            console.error(
-                "Failed to enroll:",
-                error
-            );
-
-            setEnrollError(
-                error?.response?.data?.message ||
-                "Unable to enroll in this course."
-            );
-
+            showToastSuccess("Enrolled successfully! You can now start learning.");
+        } catch (err) {
+            console.error("Failed to enroll:", err);
+            showToastError(err, "Unable to enroll in this course.");
         } finally {
-
             setEnrolling(false);
-
         }
-
     };
 
 
@@ -492,30 +464,24 @@ const CourseDetails = () => {
     */
 
     if (error || !course) {
-
         return (
-
             <div className="flex min-h-screen items-center justify-center bg-black px-6">
-
-                <div
-                    className="
-                        rounded-2xl
-                        border
-                        border-red-900
-                        bg-red-950/30
-                        px-6
-                        py-5
-                        text-sm
-                        text-red-400
-                    "
-                >
-                    {error || "Course not found."}
+                <div className="max-w-md w-full text-center">
+                    <ErrorAlert
+                        message={error || "Course not found."}
+                        onRetry={fetchCourse}
+                        className="mb-4"
+                    />
+                    <Link
+                        to="/student/courses"
+                        className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-primary)] hover:underline"
+                    >
+                        <ArrowRight size={16} className="rotate-180" />
+                        Back to Courses
+                    </Link>
                 </div>
-
             </div>
-
         );
-
     }
 
 
@@ -605,7 +571,7 @@ const CourseDetails = () => {
                     "
                 />
 
-                <div className="relative mx-auto max-w-7xl px-6 py-12 lg:py-16">
+                <div className="relative mx-auto max-w-7xl px-4 sm:px-6 py-8 sm:py-12 lg:py-16">
 
                     <div className="grid gap-10 lg:grid-cols-[1fr_390px]">
 
@@ -670,7 +636,8 @@ const CourseDetails = () => {
                                 className="
                                     mt-5
                                     max-w-3xl
-                                    text-4xl
+                                    text-2xl
+                                    sm:text-4xl
                                     font-bold
                                     tracking-tight
                                     text-white
@@ -1058,31 +1025,19 @@ const CourseDetails = () => {
                                         "
                                     >
 
-                                        {enrolling
-                                            ? "Enrolling..."
-                                            : "Enroll Now"}
-
-                                        {!enrolling && (
-                                            <ArrowRight size={17} />
+                                        {enrolling ? (
+                                            <>
+                                                <Loader2 size={17} className="animate-spin" />
+                                                Enrolling...
+                                            </>
+                                        ) : (
+                                            <>
+                                                Enroll Now
+                                                <ArrowRight size={17} />
+                                            </>
                                         )}
 
                                     </button>
-
-                                )}
-
-
-                                {enrollError && (
-
-                                    <p
-                                        className="
-                                            mt-3
-                                            text-center
-                                            text-sm
-                                            text-red-400
-                                        "
-                                    >
-                                        {enrollError}
-                                    </p>
 
                                 )}
 
@@ -1127,7 +1082,7 @@ const CourseDetails = () => {
             {/* Course Content */}
             {/* ========================================================== */}
 
-            <main className="mx-auto max-w-7xl px-6 py-12">
+            <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8 sm:py-12">
 
                 <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
 
@@ -1213,90 +1168,21 @@ const CourseDetails = () => {
                             </div>
 
                         ) : curriculumError ? (
-
-                            <div
-                                className="
-                                    mt-7
-                                    rounded-2xl
-                                    border
-                                    border-red-900
-                                    bg-red-950/30
-                                    p-10
-                                    text-center
-                                "
-                            >
-
-                                <p className="text-sm text-red-400">
-                                    {curriculumError}
-                                </p>
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setCurriculumReloadKey(
-                                            (key) => key + 1
-                                        )
-                                    }
-                                    className="
-                                        mt-4
-                                        rounded-lg
-                                        bg-[var(--color-primary)]
-                                        px-4
-                                        py-2
-                                        text-sm
-                                        font-bold
-                                        text-black
-                                        transition
-                                        hover:bg-[var(--color-primary-dark)]
-                                    "
-                                >
-                                    Retry
-                                </button>
-
-                            </div>
-
+                            <ErrorAlert
+                                message={curriculumError}
+                                onRetry={() =>
+                                    setCurriculumReloadKey(
+                                        (key) => key + 1
+                                    )
+                                }
+                                className="mt-7"
+                            />
                         ) : curriculum.length === 0 ? (
-
-                            <div
-                                className="
-                                    mt-7
-                                    rounded-2xl
-                                    border
-                                    border-[var(--color-border)]
-                                    bg-[var(--color-surface)]
-                                    p-10
-                                    text-center
-                                "
-                            >
-
-                                <BookOpen
-                                    size={40}
-                                    className="
-                                        mx-auto
-                                        text-[var(--color-primary)]
-                                    "
-                                />
-
-
-                                <h3
-                                    className="
-                                        mt-4
-                                        text-lg
-                                        font-bold
-                                        text-white
-                                    "
-                                >
-                                    Curriculum coming soon
-                                </h3>
-
-
-                                <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-                                    Lessons for this course have not
-                                    been added yet.
-                                </p>
-
-                            </div>
-
+                            <EmptyState
+                                title="Curriculum coming soon"
+                                description="Lessons and structure for this course have not been published yet."
+                                className="mt-7"
+                            />
                         ) : (
 
                             <div className="mt-7 space-y-4">

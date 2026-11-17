@@ -1,19 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
     ArrowLeft,
     Image as ImageIcon,
     Save,
     Upload,
     X,
+    Loader2,
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { getCourseById } from "@/api/course.api";
 import axiosInstance from "@/api/axios";
-import { updateCourse } from "@/api/teacher.api";
+import { getErrorMessage, showToastSuccess, showToastError } from "@/utils/errorHandler";
+import { LoadingSpinner } from "@/components/common/Skeletons";
+import ErrorAlert from "@/components/common/ErrorAlert";
 
 const EditCourse = () => {
-
     const { courseId } = useParams();
     const navigate = useNavigate();
 
@@ -22,7 +24,6 @@ const EditCourse = () => {
     const [loading, setLoading] = useState(!isCreateMode);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
 
     const [formData, setFormData] = useState({
         title: "",
@@ -39,12 +40,11 @@ const EditCourse = () => {
     const [thumbnailPreview, setThumbnailPreview] = useState("");
     const thumbnailInputRef = useRef(null);
 
-
     /* ========================================================= */
     /* Fetch Course */
     /* ========================================================= */
 
-    useEffect(() => {
+    const fetchCourse = useCallback(async () => {
         if (isCreateMode) {
             setLoading(false);
             setFormData({
@@ -62,62 +62,48 @@ const EditCourse = () => {
             return;
         }
 
-        const fetchCourse = async () => {
-            try {
-                setLoading(true);
-                setError("");
+        try {
+            setLoading(true);
+            setError("");
 
-                const response = await getCourseById(courseId);
-                const course = response.data;
+            const response = await getCourseById(courseId);
+            const course = response.data;
 
-                setFormData({
-                    title: course.title || "",
-                    courseCode: course.courseCode || "",
-                    description: course.description || "",
-                    thumbnail: course.thumbnail || "",
-                    price: course.price || 0,
-                    duration: course.duration || 0,
-                    teacher:
-                        course.teacher?._id ||
-                        course.teacher ||
-                        "",
-                    visibility: course.visibility || "public",
-                });
+            setFormData({
+                title: course.title || "",
+                courseCode: course.courseCode || "",
+                description: course.description || "",
+                thumbnail: course.thumbnail || "",
+                price: course.price || 0,
+                duration: course.duration || 0,
+                teacher: course.teacher?._id || course.teacher || "",
+                visibility: course.visibility || "public",
+            });
 
-                setThumbnailPreview(course.thumbnail || "");
-            } catch (error) {
-                console.error(
-                    "Failed to fetch course:",
-                    error
-                );
-
-                setError(
-                    "Unable to load course details."
-                );
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchCourse();
+            setThumbnailPreview(course.thumbnail || "");
+        } catch (err) {
+            console.error("Failed to fetch course:", err);
+            setError(getErrorMessage(err, "Unable to load course details."));
+        } finally {
+            setLoading(false);
+        }
     }, [courseId, isCreateMode]);
 
+    useEffect(() => {
+        fetchCourse();
+    }, [fetchCourse]);
 
     /* ========================================================= */
     /* Handle Input */
     /* ========================================================= */
 
     const handleChange = (event) => {
-
         const { name, value } = event.target;
-
         setFormData((previous) => ({
             ...previous,
             [name]: value,
         }));
-
     };
-
 
     /* ========================================================= */
     /* Thumbnail */
@@ -125,17 +111,16 @@ const EditCourse = () => {
 
     const handleThumbnailChange = (event) => {
         const file = event.target.files?.[0];
-
         if (!file) return;
 
         if (!file.type.startsWith("image/")) {
-            setError("Please select a valid image file.");
+            showToastError(null, "Please select a valid image file (JPG, PNG, or WEBP).");
             event.target.value = "";
             return;
         }
 
         if (file.size > 5 * 1024 * 1024) {
-            setError("Thumbnail image must be 5 MB or smaller.");
+            showToastError(null, "Thumbnail image must be 5 MB or smaller.");
             event.target.value = "";
             return;
         }
@@ -150,12 +135,10 @@ const EditCourse = () => {
     const removeThumbnail = () => {
         setThumbnailFile(null);
         setThumbnailPreview(formData.thumbnail || "");
-
         if (thumbnailInputRef.current) {
             thumbnailInputRef.current.value = "";
         }
     };
-
 
     /* ========================================================= */
     /* Submit */
@@ -164,166 +147,86 @@ const EditCourse = () => {
     const handleSubmit = async (event) => {
         event.preventDefault();
 
+        if (formData.title.trim().length < 3) {
+            showToastError(null, "Course title must be at least 3 characters.");
+            return;
+        }
+
+        if (formData.description.trim().length < 10) {
+            showToastError(null, "Course description must be at least 10 characters.");
+            return;
+        }
+
         try {
             setSaving(true);
             setError("");
-            setSuccess("");
-
-            if (formData.title.trim().length < 3) {
-                setError(
-                    "Course title must be at least 3 characters."
-                );
-                return;
-            }
-
-            if (formData.description.trim().length < 10) {
-                setError(
-                    "Course description must be at least 10 characters."
-                );
-                return;
-            }
 
             const payload = new FormData();
-
-            payload.append(
-                "title",
-                formData.title.trim()
-            );
-            payload.append(
-                "courseCode",
-                formData.courseCode.trim().toUpperCase()
-            );
-            payload.append(
-                "description",
-                formData.description.trim()
-            );
-            payload.append(
-                "price",
-                String(Number(formData.price) || 0)
-            );
-            payload.append(
-                "duration",
-                String(Number(formData.duration) || 0)
-            );
-            payload.append(
-                "visibility",
-                formData.visibility
-            );
+            payload.append("title", formData.title.trim());
+            payload.append("courseCode", formData.courseCode.trim().toUpperCase());
+            payload.append("description", formData.description.trim());
+            payload.append("price", String(Number(formData.price) || 0));
+            payload.append("duration", String(Number(formData.duration) || 0));
+            payload.append("visibility", formData.visibility);
 
             if (formData.teacher) {
-                payload.append(
-                    "teacher",
-                    formData.teacher
-                );
+                payload.append("teacher", formData.teacher);
             }
 
             if (thumbnailFile) {
-                payload.append(
-                    "thumbnail",
-                    thumbnailFile
-                );
+                payload.append("thumbnail", thumbnailFile);
             } else if (!isCreateMode && formData.thumbnail) {
-                payload.append(
-                    "thumbnailUrl",
-                    formData.thumbnail
-                );
+                payload.append("thumbnailUrl", formData.thumbnail);
             }
 
             let response;
-
             if (isCreateMode) {
-                response = await axiosInstance.post(
-                    "/courses",
-                    payload
-                );
+                response = await axiosInstance.post("/courses", payload);
             } else {
-                response = await axiosInstance.patch(
-                    `/courses/${courseId}`,
-                    payload
-                );
+                response = await axiosInstance.patch(`/courses/${courseId}`, payload);
             }
 
-            const savedCourse =
-                response?.data?.data ||
-                response?.data;
+            const savedCourse = response?.data?.data || response?.data;
+            const savedCourseId = savedCourse?._id || courseId;
 
-            const savedCourseId =
-                savedCourse?._id || courseId;
-
-            setSuccess(
+            showToastSuccess(
                 isCreateMode
                     ? "Course created successfully."
                     : "Course updated successfully."
             );
 
             setTimeout(() => {
-                navigate(
-                    `/teacher/courses/${savedCourseId}`
-                );
-            }, 700);
-        } catch (error) {
+                navigate(`/teacher/courses/${savedCourseId}`);
+            }, 600);
+        } catch (err) {
             console.error(
-                isCreateMode
-                    ? "Failed to create course:"
-                    : "Failed to update course:",
-                error
+                isCreateMode ? "Failed to create course:" : "Failed to update course:",
+                err
             );
-
-            setError(
-                error?.response?.data?.message ||
-                (isCreateMode
-                    ? "Unable to create course."
-                    : "Unable to update course.")
+            const msg = getErrorMessage(
+                err,
+                isCreateMode ? "Unable to create course." : "Unable to update course."
             );
+            setError(msg);
+            showToastError(err, msg);
         } finally {
             setSaving(false);
         }
     };
 
-
-    /* ========================================================= */
     /* Loading */
-    /* ========================================================= */
-
     if (loading) {
-
         return (
             <div className="flex min-h-[60vh] items-center justify-center bg-black text-white">
-
-                <div className="flex items-center gap-3 text-sm text-[var(--color-text-muted)]">
-
-                    <div
-                        className="
-                            h-5
-                            w-5
-                            animate-spin
-                            rounded-full
-                            border-2
-                            border-[var(--color-border)]
-                            border-t-[var(--color-primary)]
-                        "
-                    />
-
-                    Loading course...
-
-                </div>
-
+                <LoadingSpinner text="Loading course details..." />
             </div>
         );
-
     }
 
-
     return (
-
         <div className="min-h-screen bg-black text-white">
-
             <div className="mx-auto max-w-4xl px-6 py-8 lg:px-8">
-
-                {/* ================================================= */}
                 {/* Back */}
-                {/* ================================================= */}
-
                 <Link
                     to={
                         isCreateMode
@@ -345,57 +248,29 @@ const EditCourse = () => {
                     Back to Course
                 </Link>
 
-
-                {/* ================================================= */}
                 {/* Header */}
-                {/* ================================================= */}
-
                 <div className="mt-6">
-
                     <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-primary)]">
                         Course Management
                     </p>
-
                     <h1 className="mt-2 text-3xl font-bold tracking-tight text-white">
-                        {isCreateMode
-                            ? "Create Course"
-                            : "Edit Course"}
+                        {isCreateMode ? "Create Course" : "Edit Course"}
                     </h1>
-
                     <p className="mt-2 text-sm text-[var(--color-text-muted)]">
                         {isCreateMode
                             ? "Create a new course and start building its curriculum."
                             : "Update your course information."}
                     </p>
-
                 </div>
 
-
-                {/* ================================================= */}
-                {/* Alerts */}
-                {/* ================================================= */}
-
+                {/* Error */}
                 {error && (
-
-                    <div className="mt-6 rounded-xl border border-red-900 bg-red-950/30 p-4 text-sm text-red-400">
-                        {error}
+                    <div className="mt-6">
+                        <ErrorAlert message={error} onRetry={!isCreateMode ? fetchCourse : undefined} />
                     </div>
-
                 )}
 
-                {success && (
-
-                    <div className="mt-6 rounded-xl border border-green-900 bg-green-950/30 p-4 text-sm text-green-400">
-                        {success}
-                    </div>
-
-                )}
-
-
-                {/* ================================================= */}
                 {/* Form */}
-                {/* ================================================= */}
-
                 <form
                     onSubmit={handleSubmit}
                     className="
@@ -408,23 +283,19 @@ const EditCourse = () => {
                         md:p-8
                     "
                 >
-
                     <div className="grid gap-6 md:grid-cols-2">
-
                         {/* Title */}
-
                         <div className="md:col-span-2">
-
                             <label className="mb-2 block text-sm font-semibold text-white">
                                 Course Title
                             </label>
-
                             <input
                                 type="text"
                                 name="title"
                                 value={formData.title}
                                 onChange={handleChange}
                                 required
+                                placeholder="e.g. Full Stack Web Development"
                                 className="
                                     w-full
                                     rounded-xl
@@ -440,24 +311,20 @@ const EditCourse = () => {
                                     focus:border-[var(--color-primary)]
                                 "
                             />
-
                         </div>
 
-
                         {/* Course Code */}
-
                         <div>
-
                             <label className="mb-2 block text-sm font-semibold text-white">
                                 Course Code
                             </label>
-
                             <input
                                 type="text"
                                 name="courseCode"
                                 value={formData.courseCode}
                                 onChange={handleChange}
                                 required
+                                placeholder="e.g. CS101"
                                 className="
                                     w-full
                                     rounded-xl
@@ -473,24 +340,20 @@ const EditCourse = () => {
                                     focus:border-[var(--color-primary)]
                                 "
                             />
-
                         </div>
 
-
                         {/* Price */}
-
                         <div>
-
                             <label className="mb-2 block text-sm font-semibold text-white">
-                                Price
+                                Price (₹)
                             </label>
-
                             <input
                                 type="number"
                                 name="price"
                                 min="0"
                                 value={formData.price}
                                 onChange={handleChange}
+                                placeholder="0 for Free"
                                 className="
                                     w-full
                                     rounded-xl
@@ -505,24 +368,20 @@ const EditCourse = () => {
                                     focus:border-[var(--color-primary)]
                                 "
                             />
-
                         </div>
 
-
                         {/* Duration */}
-
                         <div>
-
                             <label className="mb-2 block text-sm font-semibold text-white">
                                 Duration (Minutes)
                             </label>
-
                             <input
                                 type="number"
                                 name="duration"
                                 min="0"
                                 value={formData.duration}
                                 onChange={handleChange}
+                                placeholder="e.g. 120"
                                 className="
                                     w-full
                                     rounded-xl
@@ -537,18 +396,13 @@ const EditCourse = () => {
                                     focus:border-[var(--color-primary)]
                                 "
                             />
-
                         </div>
 
-
                         {/* Visibility */}
-
                         <div>
-
                             <label className="mb-2 block text-sm font-semibold text-white">
                                 Visibility
                             </label>
-
                             <select
                                 name="visibility"
                                 value={formData.visibility}
@@ -567,51 +421,30 @@ const EditCourse = () => {
                                     focus:border-[var(--color-primary)]
                                 "
                             >
-
-                                <option value="public">
-                                    Public
-                                </option>
-
-                                <option value="private">
-                                    Private
-                                </option>
-
+                                <option value="public">Public</option>
+                                <option value="private">Private</option>
                             </select>
-
                         </div>
 
-
                         {/* Thumbnail */}
-
                         <div className="md:col-span-2">
                             <div className="mb-2 flex items-center justify-between gap-3">
                                 <label className="block text-sm font-semibold text-white">
                                     Course Thumbnail
                                 </label>
-
                                 <span className="text-xs text-[var(--color-text-muted)]">
                                     JPG, PNG or WEBP • Max 5 MB
                                 </span>
                             </div>
 
-                            <div
-                                className="
-                                    overflow-hidden rounded-2xl
-                                    border border-[var(--color-border)]
-                                    bg-black
-                                "
-                            >
+                            <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-black">
                                 {thumbnailPreview ? (
                                     <div className="relative">
                                         <img
                                             src={thumbnailPreview}
                                             alt="Course thumbnail preview"
-                                            className="
-                                                h-56 w-full object-cover
-                                                sm:h-64
-                                            "
+                                            className="h-56 w-full object-cover sm:h-64"
                                         />
-
                                         <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-black/90 to-transparent p-4 pt-12">
                                             <div className="min-w-0">
                                                 <p className="text-sm font-semibold text-white">
@@ -629,17 +462,11 @@ const EditCourse = () => {
                                             <div className="flex shrink-0 items-center gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() =>
-                                                        thumbnailInputRef.current?.click()
-                                                    }
+                                                    onClick={() => thumbnailInputRef.current?.click()}
                                                     className="
-                                                        inline-flex items-center
-                                                        gap-2 rounded-lg
-                                                        border border-white/20
-                                                        bg-black/70 px-3 py-2
-                                                        text-xs font-semibold
-                                                        text-white transition
-                                                        hover:bg-black
+                                                        inline-flex items-center gap-2 rounded-lg
+                                                        border border-white/20 bg-black/70 px-3 py-2
+                                                        text-xs font-semibold text-white transition hover:bg-black
                                                     "
                                                 >
                                                     <Upload size={14} />
@@ -651,10 +478,8 @@ const EditCourse = () => {
                                                         type="button"
                                                         onClick={removeThumbnail}
                                                         className="
-                                                            flex h-9 w-9 items-center
-                                                            justify-center rounded-lg
-                                                            border border-red-400/30
-                                                            bg-red-500/10 text-red-300
+                                                            flex h-9 w-9 items-center justify-center rounded-lg
+                                                            border border-red-400/30 bg-red-500/10 text-red-300
                                                             transition hover:bg-red-500/20
                                                         "
                                                         title="Remove selected image"
@@ -668,46 +493,29 @@ const EditCourse = () => {
                                 ) : (
                                     <button
                                         type="button"
-                                        onClick={() =>
-                                            thumbnailInputRef.current?.click()
-                                        }
+                                        onClick={() => thumbnailInputRef.current?.click()}
                                         className="
-                                            flex min-h-56 w-full flex-col
-                                            items-center justify-center
-                                            px-6 py-10 text-center
-                                            transition hover:bg-white/[0.02]
+                                            flex min-h-56 w-full flex-col items-center justify-center
+                                            px-6 py-10 text-center transition hover:bg-white/[0.02]
                                         "
                                     >
-                                        <div
-                                            className="
-                                                flex h-14 w-14 items-center
-                                                justify-center rounded-2xl
-                                                bg-[var(--color-primary)]/10
-                                                text-[var(--color-primary)]
-                                            "
-                                        >
+                                        <div className="
+                                            flex h-14 w-14 items-center justify-center
+                                            rounded-2xl bg-[var(--color-primary)]/10 text-[var(--color-primary)]
+                                        ">
                                             <ImageIcon size={25} />
                                         </div>
-
                                         <p className="mt-4 text-sm font-semibold text-white">
                                             Upload course thumbnail
                                         </p>
-
                                         <p className="mt-1 max-w-sm text-xs leading-5 text-[var(--color-text-muted)]">
-                                            Choose an image that represents your
-                                            course. Recommended landscape format.
+                                            Choose an image that represents your course. Recommended landscape format.
                                         </p>
-
-                                        <span
-                                            className="
-                                                mt-4 inline-flex items-center
-                                                gap-2 rounded-lg border
-                                                border-[var(--color-border)]
-                                                bg-[var(--color-surface)]
-                                                px-3.5 py-2 text-xs font-semibold
-                                                text-white
-                                            "
-                                        >
+                                        <span className="
+                                            mt-4 inline-flex items-center gap-2 rounded-lg
+                                            border border-[var(--color-border)] bg-[var(--color-surface)]
+                                            px-3.5 py-2 text-xs font-semibold text-white
+                                        ">
                                             <Upload size={14} />
                                             Choose Image
                                         </span>
@@ -724,21 +532,18 @@ const EditCourse = () => {
                             </div>
                         </div>
 
-
                         {/* Description */}
-
                         <div className="md:col-span-2">
-
                             <label className="mb-2 block text-sm font-semibold text-white">
                                 Description
                             </label>
-
                             <textarea
                                 name="description"
                                 value={formData.description}
                                 onChange={handleChange}
                                 required
                                 rows={6}
+                                placeholder="Enter detailed course description..."
                                 className="
                                     w-full
                                     resize-none
@@ -755,18 +560,11 @@ const EditCourse = () => {
                                     focus:border-[var(--color-primary)]
                                 "
                             />
-
                         </div>
-
                     </div>
 
-
-                    {/* ================================================= */}
                     {/* Submit */}
-                    {/* ================================================= */}
-
                     <div className="mt-8 flex justify-end border-t border-[var(--color-border)] pt-6">
-
                         <button
                             type="submit"
                             disabled={saving}
@@ -787,9 +585,11 @@ const EditCourse = () => {
                                 disabled:opacity-60
                             "
                         >
-
-                            <Save size={17} />
-
+                            {saving ? (
+                                <Loader2 size={17} className="animate-spin" />
+                            ) : (
+                                <Save size={17} />
+                            )}
                             {saving
                                 ? isCreateMode
                                     ? "Creating..."
@@ -797,17 +597,11 @@ const EditCourse = () => {
                                 : isCreateMode
                                     ? "Create Course"
                                     : "Save Changes"}
-
                         </button>
-
                     </div>
-
                 </form>
-
             </div>
-
         </div>
-
     );
 };
 

@@ -39,6 +39,9 @@ const SUITES = {
     auth: { file: "auth.probe.js", assertions: 45, label: "Day 9 - Authentication & Profile Management" },
     authotp: { file: "authotp.probe.js", assertions: 65, label: "Day 10 - Email OTP & Password Recovery" },
     admin: { file: "admin.probe.js", assertions: 41, label: "Day 10 - Admin Management & RBAC" },
+    day13: { file: "day13.probe.js", assertions: 12, label: "Day 13 - Security & Validation Retest" },
+    day14: { file: "day14.probe.js", assertions: 38, label: "Day 14 - Integration & Full User Journey Testing" },
+    day15: { file: "day15.probe.js", assertions: 13, label: "Day 15 - Production Hardening Verification" },
 };
 
 let server = null;
@@ -110,6 +113,7 @@ async function main() {
                 ...process.env,
                 PORT: String(PORT),
                 DISABLE_EMAIL: "true",
+                DISABLE_RATE_LIMIT: "true",
             },
             stdio: ["ignore", logFd, logFd],
         });

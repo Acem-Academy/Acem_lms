@@ -17,7 +17,10 @@
     "test:quizattempt": "node tests/regression/run.js quizattempt",
     "test:auth": "node tests/regression/run.js auth",
     "test:authotp": "node tests/regression/run.js authotp",
-    "test:admin": "node tests/regression/run.js admin"
+    "test:admin": "node tests/regression/run.js admin",
+    "test:day13": "node tests/regression/run.js day13",
+    "test:day14": "node tests/regression/run.js day14",
+    "test:day15": "node tests/regression/run.js day15"
   },
   "keywords": [],
   "author": "",

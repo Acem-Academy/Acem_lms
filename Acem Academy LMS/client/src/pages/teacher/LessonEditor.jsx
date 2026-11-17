@@ -45,6 +45,9 @@ import {
 
 import EquationPanel from "@/components/forms/EquationPanel";
 import MathText from "@/components/forms/MathText";
+import ConfirmModal from "@/components/common/ConfirmModal";
+import { LoadingSpinner } from "@/components/common/Skeletons";
+import { getErrorMessage, showToastSuccess, showToastError } from "@/utils/errorHandler";
 
 /*
 |--------------------------------------------------------------------------
@@ -277,6 +280,8 @@ function LessonEditor() {
     const quizFieldKey = (questionIndex, field, optionIndex) =>
         field === "question"
             ? `q-${questionIndex}`
+            : field === "explanation"
+            ? `q-${questionIndex}-explanation`
             : `q-${questionIndex}-opt-${optionIndex}`;
 
 
@@ -308,6 +313,7 @@ function LessonEditor() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
@@ -736,6 +742,16 @@ function LessonEditor() {
                     };
                 }
 
+                if (field === "explanation") {
+                    const current = question.explanation || "";
+                    const start = el?.selectionStart ?? current.length;
+                    const end = el?.selectionEnd ?? current.length;
+                    return {
+                        ...question,
+                        explanation: current.slice(0, start) + wrapped + current.slice(end),
+                    };
+                }
+
                 const current = question.options[optionIndex] || "";
                 const start = el?.selectionStart ?? current.length;
                 const end = el?.selectionEnd ?? current.length;
@@ -934,9 +950,18 @@ function LessonEditor() {
             return;
         }
 
+        const validFiles = [];
+        for (const file of files) {
+            if (file.size > 100 * 1024 * 1024) {
+                showToastError(null, `"${file.name}" exceeds the maximum upload limit of 100 MB.`);
+                return;
+            }
+            validFiles.push(file);
+        }
+
         setSelectedFiles((prev) => [
             ...prev,
-            ...files,
+            ...validFiles,
         ]);
 
         event.target.value = "";
@@ -1010,7 +1035,14 @@ function LessonEditor() {
             setError(
                 "Please select a valid MP4, WebM, or MOV video."
             );
+            showToastError(null, "Please select a valid MP4, WebM, or MOV video.");
+            event.target.value = "";
+            return;
+        }
 
+        if (file.size > 100 * 1024 * 1024) {
+            setError("Video file exceeds the maximum upload limit of 100 MB.");
+            showToastError(null, "Video file exceeds the maximum upload limit of 100 MB.");
             event.target.value = "";
             return;
         }
@@ -1484,6 +1516,7 @@ function LessonEditor() {
             setSuccess(
                 "Lesson updated successfully."
             );
+            showToastSuccess("Lesson updated successfully.");
 
             await fetchLesson();
 
@@ -1493,11 +1526,12 @@ function LessonEditor() {
                 err
             );
 
-            setError(
-                err?.response?.data
-                    ?.message ||
-                    "Unable to update lesson."
+            const msg = getErrorMessage(
+                err,
+                "Unable to update lesson."
             );
+            setError(msg);
+            showToastError(err, msg);
         } finally {
             setSaving(false);
         }
@@ -1510,20 +1544,14 @@ function LessonEditor() {
     |--------------------------------------------------------------------------
     */
 
-    const handleDelete = async () => {
+    const handleDelete = () => {
         if (!lesson) {
             return;
         }
+        setDeleteModalOpen(true);
+    };
 
-        const confirmed =
-            window.confirm(
-                `Are you sure you want to delete "${lesson.title}"?`
-            );
-
-        if (!confirmed) {
-            return;
-        }
-
+    const confirmDelete = async () => {
         try {
             setDeleting(true);
             setError("");
@@ -1532,6 +1560,8 @@ function LessonEditor() {
                 lessonId
             );
 
+            showToastSuccess(`"${lesson?.title || "Lesson"}" deleted successfully.`);
+            setDeleteModalOpen(false);
             navigate(
                 `/teacher/courses/${courseId}/curriculum`
             );
@@ -1542,12 +1572,13 @@ function LessonEditor() {
                 err
             );
 
-            setError(
-                err?.response?.data
-                    ?.message ||
-                    "Unable to delete lesson."
+            const msg = getErrorMessage(
+                err,
+                "Unable to delete lesson."
             );
-
+            setError(msg);
+            showToastError(err, msg);
+        } finally {
             setDeleting(false);
         }
     };
@@ -1561,21 +1592,8 @@ function LessonEditor() {
 
     if (loading) {
         return (
-            <div className="min-h-full bg-slate-50 p-6">
-                <div className="flex min-h-[500px] items-center justify-center">
-                    <div className="flex items-center gap-3 text-slate-500">
-
-                        <Loader2
-                            size={22}
-                            className="animate-spin"
-                        />
-
-                        <span className="text-sm">
-                            Loading lesson...
-                        </span>
-
-                    </div>
-                </div>
+            <div className="min-h-full bg-black p-6">
+                <LoadingSpinner text="Loading lesson..." />
             </div>
         );
     }
@@ -1588,7 +1606,7 @@ function LessonEditor() {
     */
 
     return (
-        <div className="min-h-full bg-slate-50 p-6">
+        <div className="min-h-full bg-black text-white p-4 sm:p-6 lg:p-8">
 
             {/* Header */}
 
@@ -1606,13 +1624,13 @@ function LessonEditor() {
                         className="
                             rounded-xl
                             border
-                            border-slate-200
-                            bg-white
+                            border-[var(--color-border)]
+                            bg-[var(--color-surface)]
                             p-2.5
-                            text-slate-600
-                            shadow-sm
+                            text-neutral-300
                             transition
-                            hover:bg-slate-50
+                            hover:bg-white/[0.08]
+                            hover:text-white
                         "
                     >
                         <ArrowLeft
@@ -1626,7 +1644,7 @@ function LessonEditor() {
                             className="
                                 text-2xl
                                 font-bold
-                                text-slate-900
+                                text-white
                             "
                         >
                             {isCreateMode ? "Add Lesson" : "Edit Lesson"}
@@ -1636,7 +1654,7 @@ function LessonEditor() {
                             className="
                                 mt-1
                                 text-sm
-                                text-slate-500
+                                text-[var(--color-text-muted)]
                             "
                         >
                             {isCreateMode
@@ -1656,12 +1674,12 @@ function LessonEditor() {
                         gap-2
                         rounded-xl
                         border
-                        border-slate-200
-                        bg-white
+                        border-[var(--color-border)]
+                        bg-[var(--color-surface)]
                         px-3
                         py-2
                         text-sm
-                        text-slate-500
+                        text-[var(--color-text-muted)]
                         sm:flex
                     "
                 >
@@ -1685,12 +1703,12 @@ function LessonEditor() {
                         justify-between
                         rounded-xl
                         border
-                        border-red-200
-                        bg-red-50
+                        border-red-500/30
+                        bg-red-500/10
                         px-4
                         py-3
                         text-sm
-                        text-red-700
+                        text-red-400
                     "
                 >
                     <span>
@@ -1702,7 +1720,7 @@ function LessonEditor() {
                         onClick={() =>
                             setError("")
                         }
-                        className="font-semibold"
+                        className="font-semibold text-red-400 hover:text-red-300"
                     >
                         ×
                     </button>
@@ -1718,13 +1736,13 @@ function LessonEditor() {
                         mb-6
                         rounded-xl
                         border
-                        border-green-200
-                        bg-green-50
+                        border-emerald-500/30
+                        bg-emerald-500/10
                         px-4
                         py-3
                         text-sm
                         font-medium
-                        text-green-700
+                        text-emerald-400
                     "
                 >
                     {success}
@@ -1742,7 +1760,7 @@ function LessonEditor() {
 
                     {/* Main */}
 
-                    <div className="space-y-6">
+                    <div className="min-w-0 space-y-6">
 
                         {/* Lesson Information */}
 
@@ -1750,16 +1768,15 @@ function LessonEditor() {
                             className="
                                 rounded-2xl
                                 border
-                                border-slate-200
-                                bg-white
-                                shadow-sm
+                                border-[var(--color-border)]
+                                bg-[var(--color-card)]
                             "
                         >
 
                             <div
                                 className="
                                     border-b
-                                    border-slate-200
+                                    border-[var(--color-border)]
                                     px-6
                                     py-5
                                 "
@@ -1768,7 +1785,7 @@ function LessonEditor() {
                                     className="
                                         text-lg
                                         font-semibold
-                                        text-slate-900
+                                        text-white
                                     "
                                 >
                                     Lesson Information
@@ -1778,7 +1795,7 @@ function LessonEditor() {
                                     className="
                                         mt-1
                                         text-sm
-                                        text-slate-500
+                                        text-[var(--color-text-muted)]
                                     "
                                 >
                                     Basic information about this lesson.
@@ -1799,7 +1816,7 @@ function LessonEditor() {
                                             block
                                             text-sm
                                             font-medium
-                                            text-slate-700
+                                            text-neutral-200
                                         "
                                     >
                                         Lesson Title
@@ -1820,18 +1837,18 @@ function LessonEditor() {
                                             w-full
                                             rounded-xl
                                             border
-                                            border-slate-200
-                                            bg-white
+                                            border-[var(--color-border)]
+                                            bg-black
                                             px-4
                                             py-3
                                             text-sm
-                                            text-slate-900
+                                            text-white
                                             outline-none
                                             transition
-                                            placeholder:text-slate-400
-                                            focus:border-slate-400
-                                            focus:ring-2
-                                            focus:ring-slate-100
+                                            placeholder:text-[var(--color-text-muted)]
+                                            focus:border-[var(--color-primary)]
+                                            focus:ring-1
+                                            focus:ring-[var(--color-primary)]
                                         "
                                     />
 
@@ -1849,7 +1866,7 @@ function LessonEditor() {
                                             block
                                             text-sm
                                             font-medium
-                                            text-slate-700
+                                            text-neutral-200
                                         "
                                     >
                                         Lesson Description
@@ -1871,19 +1888,19 @@ function LessonEditor() {
                                             resize-none
                                             rounded-xl
                                             border
-                                            border-slate-200
-                                            bg-white
+                                            border-[var(--color-border)]
+                                            bg-black
                                             px-4
                                             py-3
                                             text-sm
                                             leading-6
-                                            text-slate-900
+                                            text-white
                                             outline-none
                                             transition
-                                            placeholder:text-slate-400
-                                            focus:border-slate-400
-                                            focus:ring-2
-                                            focus:ring-slate-100
+                                            placeholder:text-[var(--color-text-muted)]
+                                            focus:border-[var(--color-primary)]
+                                            focus:ring-1
+                                            focus:ring-[var(--color-primary)]
                                         "
                                     />
 
@@ -1901,7 +1918,7 @@ function LessonEditor() {
                                             block
                                             text-sm
                                             font-medium
-                                            text-slate-700
+                                            text-neutral-200
                                         "
                                     >
                                         Lesson Position
@@ -1911,7 +1928,7 @@ function LessonEditor() {
                                                 ml-1
                                                 text-xs
                                                 font-normal
-                                                text-slate-400
+                                                text-[var(--color-text-muted)]
                                             "
                                         >
                                             Optional
@@ -1934,18 +1951,18 @@ function LessonEditor() {
                                             w-full
                                             rounded-xl
                                             border
-                                            border-slate-200
-                                            bg-white
+                                            border-[var(--color-border)]
+                                            bg-black
                                             px-4
                                             py-3
                                             text-sm
-                                            text-slate-900
+                                            text-white
                                             outline-none
                                             transition
-                                            placeholder:text-slate-400
-                                            focus:border-slate-400
-                                            focus:ring-2
-                                            focus:ring-slate-100
+                                            placeholder:text-[var(--color-text-muted)]
+                                            focus:border-[var(--color-primary)]
+                                            focus:ring-1
+                                            focus:ring-[var(--color-primary)]
                                         "
                                     />
 
@@ -1962,16 +1979,15 @@ function LessonEditor() {
                             className="
                                 rounded-2xl
                                 border
-                                border-slate-200
-                                bg-white
-                                shadow-sm
+                                border-[var(--color-border)]
+                                bg-[var(--color-card)]
                             "
                         >
 
                             <div
                                 className="
                                     border-b
-                                    border-slate-200
+                                    border-[var(--color-border)]
                                     px-6
                                     py-5
                                 "
@@ -1987,8 +2003,8 @@ function LessonEditor() {
                                             items-center
                                             justify-center
                                             rounded-xl
-                                            bg-slate-100
-                                            text-slate-600
+                                            bg-white/[0.05]
+                                            text-[var(--color-primary)]
                                         "
                                     >
                                         <FileText
@@ -2002,7 +2018,7 @@ function LessonEditor() {
                                             className="
                                                 text-lg
                                                 font-semibold
-                                                text-slate-900
+                                                text-white
                                             "
                                         >
                                             Lesson Content
@@ -2012,7 +2028,7 @@ function LessonEditor() {
                                             className="
                                                 mt-1
                                                 text-sm
-                                                text-slate-500
+                                                text-[var(--color-text-muted)]
                                             "
                                         >
                                             Write the learning content for this lesson.
@@ -2028,29 +2044,29 @@ function LessonEditor() {
                             <div className="p-6">
 
                                 <div
-                                    className="tiptap-lesson-editor rounded-xl border border-slate-200 bg-white"
+                                    className="tiptap-lesson-editor rounded-xl border border-[var(--color-border)] bg-[#0C0C0C]"
                                 >
-                                    <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-slate-50 p-2">
-                                        <button type="button" onClick={() => editor?.chain().focus().undo().run()} disabled={!editor?.can().undo()} className="rounded-lg px-2.5 py-2 text-slate-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-30" title="Undo"><Undo2 size={15} /></button>
-                                        <button type="button" onClick={() => editor?.chain().focus().redo().run()} disabled={!editor?.can().redo()} className="rounded-lg px-2.5 py-2 text-slate-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-30" title="Redo"><Redo2 size={15} /></button>
-                                        <span className="mx-1 h-6 w-px bg-slate-200" />
-                                        <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} className="rounded-lg px-2.5 py-2 text-sm font-bold text-slate-700 hover:bg-white" title="Bold">B</button>
-                                        <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className="rounded-lg px-2.5 py-2 text-sm italic text-slate-700 hover:bg-white" title="Italic">I</button>
-                                        <button type="button" onClick={() => editor?.chain().focus().toggleUnderline().run()} className="rounded-lg px-2.5 py-2 text-sm underline text-slate-700 hover:bg-white" title="Underline">U</button>
-                                        <button type="button" onClick={() => editor?.chain().focus().toggleStrike().run()} className="rounded-lg px-2.5 py-2 text-sm line-through text-slate-700 hover:bg-white" title="Strike">S</button>
-                                        <span className="mx-1 h-6 w-px bg-slate-200" />
+                                    <div className="flex flex-wrap items-center gap-1 border-b border-[var(--color-border)] bg-[#141414] p-2 text-neutral-300">
+                                        <button type="button" onClick={() => editor?.chain().focus().undo().run()} disabled={!editor?.can().undo()} className="rounded-lg px-2.5 py-2 text-neutral-300 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-30" title="Undo"><Undo2 size={15} /></button>
+                                        <button type="button" onClick={() => editor?.chain().focus().redo().run()} disabled={!editor?.can().redo()} className="rounded-lg px-2.5 py-2 text-neutral-300 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-30" title="Redo"><Redo2 size={15} /></button>
+                                        <span className="mx-1 h-6 w-px bg-[var(--color-border)]" />
+                                        <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} className="rounded-lg px-2.5 py-2 text-sm font-bold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Bold">B</button>
+                                        <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className="rounded-lg px-2.5 py-2 text-sm italic text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Italic">I</button>
+                                        <button type="button" onClick={() => editor?.chain().focus().toggleUnderline().run()} className="rounded-lg px-2.5 py-2 text-sm underline text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Underline">U</button>
+                                        <button type="button" onClick={() => editor?.chain().focus().toggleStrike().run()} className="rounded-lg px-2.5 py-2 text-sm line-through text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Strike">S</button>
+                                        <span className="mx-1 h-6 w-px bg-[var(--color-border)]" />
                                         {[1, 2, 3].map((level) => (
                                             <button
                                                 key={level}
                                                 type="button"
                                                 onClick={() => editor?.chain().focus().toggleHeading({ level }).run()}
-                                                className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-white"
+                                                className="rounded-lg px-2.5 py-2 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white"
                                                 title={`Heading ${level}`}
                                             >
                                                 H{level}
                                             </button>
                                         ))}
-                                        <span className="mx-1 h-6 w-px bg-slate-200" />
+                                        <span className="mx-1 h-6 w-px bg-[var(--color-border)]" />
                                         <select
                                             onChange={(event) => {
                                                 const value = event.target.value;
@@ -2059,7 +2075,7 @@ function LessonEditor() {
                                                 event.target.value = "";
                                             }}
                                             defaultValue=""
-                                            className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                            className="rounded-lg border border-[var(--color-border)] bg-[#1A1A1A] px-2 py-2 text-xs font-medium text-neutral-200 hover:bg-[#222]"
                                             title="Font size"
                                         >
                                             <option value="" disabled>Size</option>
@@ -2067,26 +2083,26 @@ function LessonEditor() {
                                                 <option key={size.label} value={size.value}>{size.label}</option>
                                             ))}
                                         </select>
-                                        <span className="mx-1 h-6 w-px bg-slate-200" />
-                                        <button type="button" onClick={() => editor?.chain().focus().toggleBulletList().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-white" title="Bullet list">• List</button>
-                                        <button type="button" onClick={() => editor?.chain().focus().toggleOrderedList().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-white" title="Numbered list">1. List</button>
-                                        <button type="button" onClick={() => editor?.chain().focus().toggleBlockquote().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-white" title="Blockquote">❝</button>
-                                        <button type="button" onClick={() => editor?.chain().focus().toggleCodeBlock().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-white" title="Code block">&lt;/&gt;</button>
-                                        <button type="button" onClick={() => editor?.chain().focus().setHorizontalRule().run()} className="rounded-lg px-2.5 py-2 text-slate-700 hover:bg-white" title="Horizontal rule"><Minus size={15} /></button>
-                                        <span className="mx-1 h-6 w-px bg-slate-200" />
-                                        <button type="button" onClick={() => editor?.chain().focus().setTextAlign("left").run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-white" title="Align left">L</button>
-                                        <button type="button" onClick={() => editor?.chain().focus().setTextAlign("center").run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-white" title="Align center">C</button>
-                                        <button type="button" onClick={() => editor?.chain().focus().setTextAlign("right").run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-white" title="Align right">R</button>
+                                        <span className="mx-1 h-6 w-px bg-[var(--color-border)]" />
+                                        <button type="button" onClick={() => editor?.chain().focus().toggleBulletList().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Bullet list">• List</button>
+                                        <button type="button" onClick={() => editor?.chain().focus().toggleOrderedList().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Numbered list">1. List</button>
+                                        <button type="button" onClick={() => editor?.chain().focus().toggleBlockquote().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Blockquote">❝</button>
+                                        <button type="button" onClick={() => editor?.chain().focus().toggleCodeBlock().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Code block">&lt;/&gt;</button>
+                                        <button type="button" onClick={() => editor?.chain().focus().setHorizontalRule().run()} className="rounded-lg px-2.5 py-2 text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Horizontal rule"><Minus size={15} /></button>
+                                        <span className="mx-1 h-6 w-px bg-[var(--color-border)]" />
+                                        <button type="button" onClick={() => editor?.chain().focus().setTextAlign("left").run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Align left">L</button>
+                                        <button type="button" onClick={() => editor?.chain().focus().setTextAlign("center").run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Align center">C</button>
+                                        <button type="button" onClick={() => editor?.chain().focus().setTextAlign("right").run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Align right">R</button>
                                         <button type="button" onClick={() => {
                                             const url = window.prompt("Link URL");
                                             if (url) editor?.chain().focus().setLink({ href: url }).run();
-                                        }} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-white" title="Add link">Link</button>
+                                        }} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Add link">Link</button>
                                         <button type="button" onClick={() => {
                                             const url = window.prompt("Image URL");
                                             if (url) editor?.chain().focus().setImage({ src: url, alt: "" }).run();
-                                        }} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-white" title="Insert image">Img</button>
-                                        <span className="mx-1 h-6 w-px bg-slate-200" />
-                                        <label className="relative flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-700 hover:bg-white" title="Text color">
+                                        }} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Insert image">Img</button>
+                                        <span className="mx-1 h-6 w-px bg-[var(--color-border)]" />
+                                        <label className="relative flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Text color">
                                             <span className="pointer-events-none">A</span>
                                             <input
                                                 type="color"
@@ -2094,8 +2110,8 @@ function LessonEditor() {
                                                 className="h-4 w-6 cursor-pointer border-0 bg-transparent p-0"
                                             />
                                         </label>
-                                        <button type="button" onClick={() => editor?.chain().focus().unsetColor().run()} className="rounded-lg px-2 py-2 text-xs font-semibold text-slate-500 hover:bg-white" title="Clear text color">A/</button>
-                                        <label className="relative flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-700 hover:bg-white" title="Highlight color">
+                                        <button type="button" onClick={() => editor?.chain().focus().unsetColor().run()} className="rounded-lg px-2 py-2 text-xs font-semibold text-[var(--color-text-muted)] hover:bg-white/[0.08] hover:text-white" title="Clear text color">A/</button>
+                                        <label className="relative flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Highlight color">
                                             <span className="pointer-events-none">HL</span>
                                             <input
                                                 type="color"
@@ -2104,30 +2120,30 @@ function LessonEditor() {
                                                 className="h-4 w-6 cursor-pointer border-0 bg-transparent p-0"
                                             />
                                         </label>
-                                        <button type="button" onClick={() => editor?.chain().focus().unsetHighlight().run()} className="rounded-lg px-2 py-2 text-xs font-semibold text-slate-500 hover:bg-white" title="Clear highlight">HL/</button>
-                                        <button type="button" onClick={() => editor?.chain().focus().toggleSubscript().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-white" title="Subscript">X₂</button>
-                                        <button type="button" onClick={() => editor?.chain().focus().toggleSuperscript().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-white" title="Superscript">X²</button>
-                                        <span className="mx-1 h-6 w-px bg-slate-200" />
+                                        <button type="button" onClick={() => editor?.chain().focus().unsetHighlight().run()} className="rounded-lg px-2 py-2 text-xs font-semibold text-[var(--color-text-muted)] hover:bg-white/[0.08] hover:text-white" title="Clear highlight">HL/</button>
+                                        <button type="button" onClick={() => editor?.chain().focus().toggleSubscript().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Subscript">X₂</button>
+                                        <button type="button" onClick={() => editor?.chain().focus().toggleSuperscript().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-neutral-300 hover:bg-white/[0.08] hover:text-white" title="Superscript">X²</button>
+                                        <span className="mx-1 h-6 w-px bg-[var(--color-border)]" />
                                         <button
                                             type="button"
                                             onClick={openNewEquation}
-                                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-white/[0.06] px-3 py-2 text-xs font-semibold text-neutral-200 hover:bg-white/[0.1] hover:text-white"
                                             title="Insert equation"
                                         >
-                                            <Sigma size={13} />
+                                            <Sigma size={13} className="text-[var(--color-primary)]" />
                                             Equation
                                         </button>
-                                        <button type="button" onClick={() => editor?.chain().focus().unsetAllMarks().clearNodes().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-white" title="Clear formatting">Clear</button>
+                                        <button type="button" onClick={() => editor?.chain().focus().unsetAllMarks().clearNodes().run()} className="rounded-lg px-2.5 py-2 text-xs font-semibold text-[var(--color-text-muted)] hover:bg-white/[0.08] hover:text-white" title="Clear formatting">Clear</button>
                                     </div>
 
                                     <EditorContent
     editor={editor}
-    className='tiptap-lesson-content min-h-[420px] p-5 text-[15px] leading-7 text-slate-800 [&_.tiptap-mathematics-render[data-type="block-math"]]:my-6 [&_.tiptap-mathematics-render[data-type="block-math"]]:overflow-x-auto [&_.tiptap-mathematics-render[data-type="block-math"]]:py-2 [&_.tiptap-mathematics-render]:cursor-pointer'
+    className='tiptap-lesson-content min-h-[420px] p-5 text-[15px] leading-7 text-neutral-100 [&_.tiptap-mathematics-render[data-type="block-math"]]:my-6 [&_.tiptap-mathematics-render[data-type="block-math"]]:overflow-x-auto [&_.tiptap-mathematics-render[data-type="block-math"]]:py-2 [&_.tiptap-mathematics-render]:cursor-pointer'
 />
                                 </div>
 
-                                <p className="mt-3 text-xs leading-5 text-slate-400">
-                                    Click <span className="font-semibold text-slate-500">Equation</span> to build one with the symbol picker, or type LaTeX directly into the box that opens. Click any existing equation in the lesson to edit it the same way.
+                                <p className="mt-3 text-xs leading-5 text-[var(--color-text-muted)]">
+                                    Click <span className="font-semibold text-white">Equation</span> to build one with the symbol picker, or type LaTeX directly into the box that opens. Click any existing equation in the lesson to edit it the same way.
                                 </p>
 
                             </div>
@@ -2141,16 +2157,15 @@ function LessonEditor() {
                             className="
                                 rounded-2xl
                                 border
-                                border-slate-200
-                                bg-white
-                                shadow-sm
+                                border-[var(--color-border)]
+                                bg-[var(--color-card)]
                             "
                         >
 
                             <div
                                 className="
                                     border-b
-                                    border-slate-200
+                                    border-[var(--color-border)]
                                     px-6
                                     py-5
                                 "
@@ -2160,17 +2175,17 @@ function LessonEditor() {
                                         <div
                                             className="
                                                 flex h-10 w-10 items-center justify-center
-                                                rounded-xl bg-slate-100 text-slate-600
+                                                rounded-xl bg-white/[0.05] text-[var(--color-primary)]
                                             "
                                         >
                                             <ClipboardList size={19} />
                                         </div>
 
                                         <div>
-                                            <h2 className="text-lg font-semibold text-slate-900">
+                                            <h2 className="text-lg font-semibold text-white">
                                                 Lesson Quiz
                                             </h2>
-                                            <p className="mt-1 text-sm text-slate-500">
+                                            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
                                                 Add questions that students must answer after this lesson.
                                             </p>
                                         </div>
@@ -2187,15 +2202,15 @@ function LessonEditor() {
                                         className={`relative h-6 w-11 shrink-0 rounded-full transition ${
                                             quiz.enabled
                                                 ? "bg-[var(--color-primary)]"
-                                                : "bg-slate-300"
+                                                : "bg-neutral-800"
                                         }`}
                                         aria-label="Toggle lesson quiz"
                                     >
                                         <span
                                             className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${
                                                 quiz.enabled
-                                                    ? "left-6"
-                                                    : "left-1"
+                                                    ? "left-6 bg-black"
+                                                    : "left-1 bg-white"
                                             }`}
                                         />
                                     </button>
@@ -2207,7 +2222,7 @@ function LessonEditor() {
 
                                     <div className="grid gap-5 md:grid-cols-2">
                                         <div>
-                                            <label className="mb-2 block text-sm font-medium text-slate-700">
+                                            <label className="mb-2 block text-sm font-medium text-neutral-200">
                                                 Quiz Title
                                             </label>
                                             <input
@@ -2220,13 +2235,13 @@ function LessonEditor() {
                                                     )
                                                 }
                                                 placeholder="Lesson Quiz"
-                                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                className="w-full rounded-xl border border-[var(--color-border)] bg-black px-4 py-3 text-sm text-white outline-none transition placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]"
                                             />
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="mb-2 block text-sm font-medium text-slate-700">
+                                                <label className="mb-2 block text-sm font-medium text-neutral-200">
                                                     Passing Score (%)
                                                 </label>
                                                 <input
@@ -2240,12 +2255,12 @@ function LessonEditor() {
                                                             event.target.value
                                                         )
                                                     }
-                                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                    className="w-full rounded-xl border border-[var(--color-border)] bg-black px-4 py-3 text-sm text-white outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]"
                                                 />
                                             </div>
 
                                             <div>
-                                                <label className="mb-2 block text-sm font-medium text-slate-700">
+                                                <label className="mb-2 block text-sm font-medium text-neutral-200">
                                                     Max Attempts
                                                 </label>
                                                 <input
@@ -2258,14 +2273,14 @@ function LessonEditor() {
                                                             event.target.value
                                                         )
                                                     }
-                                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                    className="w-full rounded-xl border border-[var(--color-border)] bg-black px-4 py-3 text-sm text-white outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]"
                                                 />
                                             </div>
                                         </div>
                                     </div>
 
                                     <div>
-                                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                                        <label className="mb-2 block text-sm font-medium text-neutral-200">
                                             Quiz Description
                                         </label>
                                         <textarea
@@ -2278,17 +2293,17 @@ function LessonEditor() {
                                                 )
                                             }
                                             placeholder="Explain what students should know before starting the quiz..."
-                                            className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                            className="w-full resize-none rounded-xl border border-[var(--color-border)] bg-black px-4 py-3 text-sm leading-6 text-white outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]"
                                         />
                                     </div>
 
                                     <div className="space-y-5">
                                         <div className="flex items-center justify-between gap-4">
                                             <div>
-                                                <h3 className="text-sm font-semibold text-slate-900">
+                                                <h3 className="text-sm font-semibold text-white">
                                                     Questions
                                                 </h3>
-                                                <p className="mt-1 text-xs text-slate-500">
+                                                <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                                                     Students will see one question at a time.
                                                 </p>
                                             </div>
@@ -2296,7 +2311,7 @@ function LessonEditor() {
                                             <button
                                                 type="button"
                                                 onClick={addQuestion}
-                                                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-slate-800"
+                                                className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-4 py-2.5 text-xs font-bold text-black transition hover:bg-[var(--color-primary-dark)]"
                                             >
                                                 <Plus size={15} />
                                                 Add Question
@@ -2306,18 +2321,18 @@ function LessonEditor() {
                                         {quiz.questions.map((question, questionIndex) => (
                                             <div
                                                 key={`quiz-question-${questionIndex}`}
-                                                className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5"
+                                                className="min-w-0 rounded-2xl border border-[var(--color-border)] bg-[#111111] p-5"
                                             >
                                                 <div className="mb-5 flex items-center justify-between gap-3">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-xs font-bold text-slate-700 shadow-sm">
+                                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.08] text-xs font-bold text-neutral-200 shadow-sm">
                                                             {questionIndex + 1}
                                                         </div>
                                                         <div>
-                                                            <p className="text-sm font-semibold text-slate-800">
+                                                            <p className="text-sm font-semibold text-white">
                                                                 Question {questionIndex + 1}
                                                             </p>
-                                                            <p className="text-xs text-slate-400">
+                                                            <p className="text-xs text-[var(--color-text-muted)]">
                                                                 Select the correct option for this question.
                                                             </p>
                                                         </div>
@@ -2329,7 +2344,7 @@ function LessonEditor() {
                                                             onClick={() =>
                                                                 removeQuestion(questionIndex)
                                                             }
-                                                            className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                                                            className="rounded-lg p-2 text-neutral-400 transition hover:bg-red-500/10 hover:text-red-400"
                                                             title="Remove question"
                                                         >
                                                             <Trash2 size={16} />
@@ -2340,13 +2355,13 @@ function LessonEditor() {
                                                 <div className="space-y-5">
                                                     <div>
                                                         <div className="mb-2 flex items-center justify-between gap-3">
-                                                            <label className="block text-sm font-medium text-slate-700">
+                                                            <label className="block text-sm font-medium text-neutral-200">
                                                                 Question
                                                             </label>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => openQuizEquation(questionIndex, "question")}
-                                                                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800"
+                                                                className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-primary)] hover:underline"
                                                             >
                                                                 <Sigma size={12} />
                                                                 Equation
@@ -2366,10 +2381,10 @@ function LessonEditor() {
                                                                 )
                                                             }
                                                             placeholder="Enter the question... use the Equation button for math"
-                                                            className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                            className="w-full resize-none rounded-xl border border-[var(--color-border)] bg-black px-4 py-3 text-sm leading-6 text-white outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]"
                                                         />
                                                         {question.question.includes("\\(") && (
-                                                            <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                                            <div className="mt-2 max-w-full min-w-0 overflow-x-auto rounded-lg border border-[var(--color-border)] bg-black/40 px-3 py-2 text-sm text-neutral-200 break-words">
                                                                 <MathText value={question.question} />
                                                             </div>
                                                         )}
@@ -2377,13 +2392,13 @@ function LessonEditor() {
 
                                                     <div>
                                                         <div className="mb-3 flex items-center justify-between gap-3">
-                                                            <label className="block text-sm font-medium text-slate-700">
+                                                            <label className="block text-sm font-medium text-neutral-200">
                                                                 Options
                                                             </label>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => addOption(questionIndex)}
-                                                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
+                                                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--color-primary)] hover:underline"
                                                             >
                                                                 <Plus size={14} />
                                                                 Add Option
@@ -2408,7 +2423,7 @@ function LessonEditor() {
                                                                         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-xs font-bold transition ${
                                                                             Number(question.correctAnswer) === optionIndex
                                                                                 ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-black"
-                                                                                : "border-slate-200 bg-white text-slate-500 hover:border-slate-400"
+                                                                                : "border-[var(--color-border)] bg-[#1A1A1A] text-neutral-300 hover:border-neutral-500"
                                                                         }`}
                                                                         title="Set as correct answer"
                                                                     >
@@ -2432,10 +2447,10 @@ function LessonEditor() {
                                                                                 )
                                                                             }
                                                                             placeholder={`Option ${String.fromCharCode(65 + optionIndex)}`}
-                                                                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                                            className="w-full rounded-xl border border-[var(--color-border)] bg-black px-4 py-3 text-sm text-white outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]"
                                                                         />
                                                                         {option.includes("\\(") && (
-                                                                            <div className="mt-1 px-1 text-sm text-slate-700">
+                                                                            <div className="mt-1 max-w-full min-w-0 overflow-x-auto px-1 text-sm text-neutral-200 break-words">
                                                                                 <MathText value={option} />
                                                                             </div>
                                                                         )}
@@ -2446,10 +2461,10 @@ function LessonEditor() {
                                                                         onClick={() =>
                                                                             openQuizEquation(questionIndex, "option", optionIndex)
                                                                         }
-                                                                        className="shrink-0 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                                                                        className="shrink-0 rounded-lg p-2 text-neutral-400 transition hover:bg-white/[0.08] hover:text-white"
                                                                         title="Insert equation"
                                                                     >
-                                                                        <Sigma size={15} />
+                                                                        <Sigma size={15} className="text-[var(--color-primary)]" />
                                                                     </button>
 
                                                                     {question.options.length > 2 && (
@@ -2461,7 +2476,7 @@ function LessonEditor() {
                                                                                     optionIndex
                                                                                 )
                                                                             }
-                                                                            className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                                                                            className="rounded-lg p-2 text-neutral-400 transition hover:bg-red-500/10 hover:text-red-400"
                                                                             title="Remove option"
                                                                         >
                                                                             <X size={16} />
@@ -2471,14 +2486,14 @@ function LessonEditor() {
                                                             ))}
                                                         </div>
 
-                                                        <p className="mt-2 text-xs text-slate-400">
+                                                        <p className="mt-2 text-xs text-[var(--color-text-muted)]">
                                                             Click an A/B/C/D button to mark the correct answer.
                                                         </p>
                                                     </div>
 
                                                     <div className="grid gap-5 md:grid-cols-[160px_1fr]">
                                                         <div>
-                                                            <label className="mb-2 block text-sm font-medium text-slate-700">
+                                                            <label className="mb-2 block text-sm font-medium text-neutral-200">
                                                                 Points
                                                             </label>
                                                             <input
@@ -2492,15 +2507,30 @@ function LessonEditor() {
                                                                         event.target.value
                                                                     )
                                                                 }
-                                                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                                className="w-full rounded-xl border border-[var(--color-border)] bg-black px-4 py-3 text-sm text-white outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]"
                                                             />
                                                         </div>
 
                                                         <div>
-                                                            <label className="mb-2 block text-sm font-medium text-slate-700">
-                                                                Explanation
-                                                            </label>
+                                                            <div className="mb-2 flex items-center justify-between gap-3">
+                                                                <label className="block text-sm font-medium text-neutral-200">
+                                                                    Explanation
+                                                                </label>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openQuizEquation(questionIndex, "explanation")}
+                                                                    className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-primary)] hover:underline"
+                                                                >
+                                                                    <Sigma size={12} />
+                                                                    Equation
+                                                                </button>
+                                                            </div>
                                                             <input
+                                                                ref={(el) => {
+                                                                    quizFieldRefs.current[
+                                                                        quizFieldKey(questionIndex, "explanation")
+                                                                    ] = el;
+                                                                }}
                                                                 type="text"
                                                                 value={question.explanation}
                                                                 onChange={(event) =>
@@ -2511,8 +2541,13 @@ function LessonEditor() {
                                                                     )
                                                                 }
                                                                 placeholder="Optional explanation shown after submission"
-                                                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                                className="w-full rounded-xl border border-[var(--color-border)] bg-black px-4 py-3 text-sm text-white outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]"
                                                             />
+                                                            {question.explanation?.includes("\\(") && (
+                                                                <div className="mt-2 max-w-full min-w-0 overflow-x-auto rounded-lg border border-[var(--color-border)] bg-black/40 px-3 py-2 text-sm text-neutral-200 break-words">
+                                                                    <MathText value={question.explanation} />
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -2530,8 +2565,8 @@ function LessonEditor() {
                             className="
                                 rounded-2xl
                                 border
-                                border-slate-200
-                                bg-white
+                                border-[var(--color-border)]
+                                bg-[var(--color-surface)]
                                 shadow-sm
                             "
                         >
@@ -2539,7 +2574,7 @@ function LessonEditor() {
                             <div
                                 className="
                                     border-b
-                                    border-slate-200
+                                    border-[var(--color-border)]
                                     px-6
                                     py-5
                                 "
@@ -2555,8 +2590,8 @@ function LessonEditor() {
                                             items-center
                                             justify-center
                                             rounded-xl
-                                            bg-slate-100
-                                            text-slate-600
+                                            bg-white/[0.05]
+                                            text-[var(--color-primary)]
                                         "
                                     >
                                         <FileText
@@ -2570,7 +2605,7 @@ function LessonEditor() {
                                             className="
                                                 text-lg
                                                 font-semibold
-                                                text-slate-900
+                                                text-white
                                             "
                                         >
                                             Course Material
@@ -2580,7 +2615,7 @@ function LessonEditor() {
                                             className="
                                                 mt-1
                                                 text-sm
-                                                text-slate-500
+                                                text-neutral-400
                                             "
                                         >
                                             Add PDFs, documents or other lesson resources.
@@ -2607,19 +2642,19 @@ function LessonEditor() {
                                         rounded-xl
                                         border
                                         border-dashed
-                                        border-slate-300
-                                        bg-slate-50
+                                        border-[var(--color-border)]
+                                        bg-black/40
                                         p-8
                                         text-center
                                         transition
-                                        hover:border-slate-400
-                                        hover:bg-slate-100
+                                        hover:border-neutral-500
+                                        hover:bg-white/[0.02]
                                     "
                                 >
 
                                     <Upload
                                         size={30}
-                                        className="text-slate-400"
+                                        className="text-neutral-400"
                                     />
 
                                     <h3
@@ -2627,7 +2662,7 @@ function LessonEditor() {
                                             mt-3
                                             text-sm
                                             font-semibold
-                                            text-slate-700
+                                            text-neutral-200
                                         "
                                     >
                                         Upload course material
@@ -2637,7 +2672,7 @@ function LessonEditor() {
                                         className="
                                             mt-1
                                             text-xs
-                                            text-slate-500
+                                            text-neutral-400
                                         "
                                     >
                                         PDF, documents and other supported files
@@ -2647,13 +2682,14 @@ function LessonEditor() {
                                         className="
                                             mt-4
                                             rounded-lg
-                                            bg-white
+                                            bg-[var(--color-primary)]
                                             px-4
                                             py-2
                                             text-xs
                                             font-semibold
-                                            text-slate-700
+                                            text-black
                                             shadow-sm
+                                            hover:opacity-90
                                         "
                                     >
                                         Choose Files
@@ -2683,7 +2719,7 @@ function LessonEditor() {
                                                 font-semibold
                                                 uppercase
                                                 tracking-wide
-                                                text-slate-400
+                                                text-neutral-400
                                             "
                                         >
                                             Uploaded Materials
@@ -2703,8 +2739,8 @@ function LessonEditor() {
                                                         gap-3
                                                         rounded-xl
                                                         border
-                                                        border-slate-200
-                                                        bg-white
+                                                        border-[var(--color-border)]
+                                                        bg-black/40
                                                         px-4
                                                         py-3
                                                     "
@@ -2728,8 +2764,8 @@ function LessonEditor() {
                                                                 items-center
                                                                 justify-center
                                                                 rounded-lg
-                                                                bg-slate-100
-                                                                text-slate-500
+                                                                bg-white/[0.05]
+                                                                text-neutral-300
                                                             "
                                                         >
                                                             <File
@@ -2746,7 +2782,7 @@ function LessonEditor() {
                                                                     truncate
                                                                     text-sm
                                                                     font-medium
-                                                                    text-slate-700
+                                                                    text-neutral-200
                                                                 "
                                                             >
                                                                 {
@@ -2758,7 +2794,7 @@ function LessonEditor() {
                                                                 className="
                                                                     mt-0.5
                                                                     text-xs
-                                                                    text-slate-400
+                                                                    text-neutral-400
                                                                 "
                                                             >
                                                                 {
@@ -2782,10 +2818,10 @@ function LessonEditor() {
                                                             className="
                                                                 rounded-lg
                                                                 p-2
-                                                                text-slate-500
+                                                                text-neutral-400
                                                                 transition
-                                                                hover:bg-slate-100
-                                                                hover:text-slate-800
+                                                                hover:bg-white/[0.05]
+                                                                hover:text-white
                                                             "
                                                         >
                                                             <ExternalLink
@@ -2805,10 +2841,10 @@ function LessonEditor() {
                                                             className="
                                                                 rounded-lg
                                                                 p-2
-                                                                text-slate-400
+                                                                text-neutral-400
                                                                 transition
-                                                                hover:bg-red-50
-                                                                hover:text-red-600
+                                                                hover:bg-red-500/10
+                                                                hover:text-red-400
                                                             "
                                                         >
                                                             <X
@@ -2840,7 +2876,7 @@ function LessonEditor() {
                                                 font-semibold
                                                 uppercase
                                                 tracking-wide
-                                                text-slate-400
+                                                text-neutral-400
                                             "
                                         >
                                             New Files
@@ -2860,8 +2896,8 @@ function LessonEditor() {
                                                         gap-3
                                                         rounded-xl
                                                         border
-                                                        border-slate-200
-                                                        bg-slate-50
+                                                        border-[var(--color-border)]
+                                                        bg-black/40
                                                         px-4
                                                         py-3
                                                     "
@@ -2873,7 +2909,7 @@ function LessonEditor() {
                                                             size={
                                                                 18
                                                             }
-                                                            className="shrink-0 text-slate-500"
+                                                            className="shrink-0 text-neutral-400"
                                                         />
 
                                                         <div className="min-w-0">
@@ -2883,7 +2919,7 @@ function LessonEditor() {
                                                                     truncate
                                                                     text-sm
                                                                     font-medium
-                                                                    text-slate-700
+                                                                    text-neutral-200
                                                                 "
                                                             >
                                                                 {
@@ -2891,7 +2927,7 @@ function LessonEditor() {
                                                                 }
                                                             </p>
 
-                                                            <p className="text-xs text-slate-400">
+                                                            <p className="text-xs text-neutral-400">
                                                                 {formatFileSize(
                                                                     file.size
                                                                 )}
@@ -2911,10 +2947,10 @@ function LessonEditor() {
                                                         className="
                                                             rounded-lg
                                                             p-2
-                                                            text-slate-400
+                                                            text-neutral-400
                                                             transition
-                                                            hover:bg-red-50
-                                                            hover:text-red-600
+                                                            hover:bg-red-500/10
+                                                            hover:text-red-400
                                                         "
                                                     >
                                                         <X
@@ -2942,8 +2978,8 @@ function LessonEditor() {
                             className="
                                 rounded-2xl
                                 border
-                                border-slate-200
-                                bg-white
+                                border-[var(--color-border)]
+                                bg-[var(--color-surface)]
                                 shadow-sm
                             "
                         >
@@ -2951,7 +2987,7 @@ function LessonEditor() {
                             <div
                                 className="
                                     border-b
-                                    border-slate-200
+                                    border-[var(--color-border)]
                                     px-6
                                     py-5
                                 "
@@ -2967,8 +3003,8 @@ function LessonEditor() {
                                             items-center
                                             justify-center
                                             rounded-xl
-                                            bg-slate-100
-                                            text-slate-600
+                                            bg-white/[0.05]
+                                            text-[var(--color-primary)]
                                         "
                                     >
                                         <Video
@@ -2982,7 +3018,7 @@ function LessonEditor() {
                                             className="
                                                 text-lg
                                                 font-semibold
-                                                text-slate-900
+                                                text-white
                                             "
                                         >
                                             Video Lesson
@@ -2992,7 +3028,7 @@ function LessonEditor() {
                                             className="
                                                 mt-1
                                                 text-sm
-                                                text-slate-500
+                                                text-neutral-400
                                             "
                                         >
                                             Add a YouTube video or upload a lesson video.
@@ -3017,7 +3053,7 @@ function LessonEditor() {
                                             block
                                             text-sm
                                             font-medium
-                                            text-slate-700
+                                            text-neutral-300
                                         "
                                     >
                                         Video Source
@@ -3050,7 +3086,7 @@ function LessonEditor() {
                                                     videoData.type ===
                                                     "youtube"
                                                         ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-black"
-                                                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                                        : "border-[var(--color-border)] bg-black/40 text-neutral-300 hover:bg-white/[0.05]"
                                                 }
                                             `}
                                         >
@@ -3088,7 +3124,7 @@ function LessonEditor() {
                                                     videoData.type ===
                                                     "upload"
                                                         ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-black"
-                                                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                                        : "border-[var(--color-border)] bg-black/40 text-neutral-300 hover:bg-white/[0.05]"
                                                 }
                                             `}
                                         >
@@ -3120,7 +3156,7 @@ function LessonEditor() {
                                                     block
                                                     text-sm
                                                     font-medium
-                                                    text-slate-700
+                                                    text-neutral-300
                                                 "
                                             >
                                                 YouTube Video URL
@@ -3141,18 +3177,18 @@ function LessonEditor() {
                                                     w-full
                                                     rounded-xl
                                                     border
-                                                    border-slate-200
-                                                    bg-white
+                                                    border-[var(--color-border)]
+                                                    bg-black
                                                     px-4
                                                     py-3
                                                     text-sm
-                                                    text-slate-900
+                                                    text-white
                                                     outline-none
                                                     transition
-                                                    placeholder:text-slate-400
-                                                    focus:border-slate-400
-                                                    focus:ring-2
-                                                    focus:ring-slate-100
+                                                    placeholder:text-neutral-500
+                                                    focus:border-[var(--color-primary)]
+                                                    focus:ring-1
+                                                    focus:ring-[var(--color-primary)]
                                                 "
                                             />
 
@@ -3162,7 +3198,7 @@ function LessonEditor() {
                                                         mt-2
                                                         text-xs
                                                         font-medium
-                                                        text-green-600
+                                                        text-emerald-400
                                                     "
                                                 >
                                                     ✓ Valid YouTube video detected
@@ -3183,7 +3219,7 @@ function LessonEditor() {
                                                         className="
                                                             text-sm
                                                             font-medium
-                                                            text-slate-700
+                                                            text-neutral-300
                                                         "
                                                     >
                                                         Video Preview
@@ -3201,8 +3237,8 @@ function LessonEditor() {
                                                             gap-1
                                                             text-xs
                                                             font-medium
-                                                            text-slate-500
-                                                            hover:text-slate-900
+                                                            text-neutral-400
+                                                            hover:text-white
                                                         "
                                                     >
                                                         Open YouTube
@@ -3220,6 +3256,8 @@ function LessonEditor() {
                                                         aspect-video
                                                         overflow-hidden
                                                         rounded-xl
+                                                        border
+                                                        border-[var(--color-border)]
                                                         bg-black
                                                     "
                                                 >
@@ -3260,13 +3298,13 @@ function LessonEditor() {
                                                 rounded-xl
                                                 border
                                                 border-dashed
-                                                border-slate-300
-                                                bg-slate-50
+                                                border-[var(--color-border)]
+                                                bg-black/40
                                                 p-8
                                                 text-center
                                                 transition
-                                                hover:border-slate-400
-                                                hover:bg-slate-100
+                                                hover:border-neutral-500
+                                                hover:bg-white/[0.02]
                                             "
                                         >
 
@@ -3274,7 +3312,7 @@ function LessonEditor() {
                                                 size={
                                                     30
                                                 }
-                                                className="text-slate-400"
+                                                className="text-neutral-400"
                                             />
 
                                             <h3
@@ -3282,7 +3320,7 @@ function LessonEditor() {
                                                     mt-3
                                                     text-sm
                                                     font-semibold
-                                                    text-slate-700
+                                                    text-neutral-200
                                                 "
                                             >
                                                 Upload lesson video
@@ -3292,7 +3330,7 @@ function LessonEditor() {
                                                 className="
                                                     mt-1
                                                     text-xs
-                                                    text-slate-500
+                                                    text-neutral-400
                                                 "
                                             >
                                                 MP4, WebM or MOV
@@ -3302,13 +3340,14 @@ function LessonEditor() {
                                                 className="
                                                     mt-4
                                                     rounded-lg
-                                                    bg-white
+                                                    bg-[var(--color-primary)]
                                                     px-4
                                                     py-2
                                                     text-xs
                                                     font-semibold
-                                                    text-slate-700
+                                                    text-black
                                                     shadow-sm
+                                                    hover:opacity-90
                                                 "
                                             >
                                                 Choose Video
@@ -3337,8 +3376,8 @@ function LessonEditor() {
                                                     gap-3
                                                     rounded-xl
                                                     border
-                                                    border-slate-200
-                                                    bg-white
+                                                    border-[var(--color-border)]
+                                                    bg-black/40
                                                     px-4
                                                     py-3
                                                 "
@@ -3355,8 +3394,8 @@ function LessonEditor() {
                                                             items-center
                                                             justify-center
                                                             rounded-lg
-                                                            bg-slate-100
-                                                            text-slate-500
+                                                            bg-white/[0.05]
+                                                            text-neutral-300
                                                         "
                                                     >
                                                         <Video
@@ -3373,7 +3412,7 @@ function LessonEditor() {
                                                                 truncate
                                                                 text-sm
                                                                 font-medium
-                                                                text-slate-700
+                                                                text-neutral-200
                                                             "
                                                         >
                                                             {
@@ -3381,7 +3420,7 @@ function LessonEditor() {
                                                             }
                                                         </p>
 
-                                                        <p className="text-xs text-slate-400">
+                                                        <p className="text-xs text-neutral-400">
                                                             {formatFileSize(
                                                                 selectedVideo.size
                                                             )}
@@ -3400,10 +3439,10 @@ function LessonEditor() {
                                                     className="
                                                         rounded-lg
                                                         p-2
-                                                        text-slate-400
+                                                        text-neutral-400
                                                         transition
-                                                        hover:bg-red-50
-                                                        hover:text-red-600
+                                                        hover:bg-red-500/10
+                                                        hover:text-red-400
                                                     "
                                                 >
                                                     <X
@@ -3429,8 +3468,8 @@ function LessonEditor() {
                                                     className="
                                                         rounded-xl
                                                         border
-                                                        border-slate-200
-                                                        bg-slate-50
+                                                        border-[var(--color-border)]
+                                                        bg-black/40
                                                         p-4
                                                     "
                                                 >
@@ -3448,8 +3487,8 @@ function LessonEditor() {
                                                                     items-center
                                                                     justify-center
                                                                     rounded-lg
-                                                                    bg-white
-                                                                    text-slate-500
+                                                                    bg-white/[0.05]
+                                                                    text-neutral-300
                                                                 "
                                                             >
                                                                 <Video
@@ -3461,11 +3500,11 @@ function LessonEditor() {
 
                                                             <div className="min-w-0">
 
-                                                                <p className="text-sm font-medium text-slate-700">
+                                                                <p className="text-sm font-medium text-neutral-200">
                                                                     Existing uploaded video
                                                                 </p>
 
-                                                                <p className="truncate text-xs text-slate-400">
+                                                                <p className="truncate text-xs text-neutral-400">
                                                                     {
                                                                         lesson
                                                                             .video
@@ -3490,10 +3529,10 @@ function LessonEditor() {
                                                                 shrink-0
                                                                 rounded-lg
                                                                 p-2
-                                                                text-slate-500
+                                                                text-neutral-400
                                                                 transition
-                                                                hover:bg-white
-                                                                hover:text-slate-900
+                                                                hover:bg-white/[0.05]
+                                                                hover:text-white
                                                             "
                                                         >
                                                             <ExternalLink
@@ -3528,8 +3567,8 @@ function LessonEditor() {
                             className="
                                 rounded-2xl
                                 border
-                                border-slate-200
-                                bg-white
+                                border-[var(--color-border)]
+                                bg-[var(--color-surface)]
                                 shadow-sm
                             "
                         >
@@ -3537,7 +3576,7 @@ function LessonEditor() {
                             <div
                                 className="
                                     border-b
-                                    border-slate-200
+                                    border-[var(--color-border)]
                                     px-5
                                     py-4
                                 "
@@ -3546,7 +3585,7 @@ function LessonEditor() {
                                 <h2
                                     className="
                                         font-semibold
-                                        text-slate-900
+                                        text-white
                                     "
                                 >
                                     Lesson Settings
@@ -3563,8 +3602,8 @@ function LessonEditor() {
                                     className="
                                         rounded-xl
                                         border
-                                        border-slate-200
-                                        bg-slate-50
+                                        border-[var(--color-border)]
+                                        bg-black/40
                                         p-4
                                     "
                                 >
@@ -3588,8 +3627,8 @@ function LessonEditor() {
                                                     items-center
                                                     justify-center
                                                     rounded-lg
-                                                    bg-white
-                                                    text-slate-500
+                                                    bg-white/[0.05]
+                                                    text-[var(--color-primary)]
                                                 "
                                             >
                                                 {formData.isPreview ? (
@@ -3613,7 +3652,7 @@ function LessonEditor() {
                                                     className="
                                                         text-sm
                                                         font-medium
-                                                        text-slate-800
+                                                        text-neutral-200
                                                     "
                                                 >
                                                     Preview Lesson
@@ -3623,7 +3662,7 @@ function LessonEditor() {
                                                     className="
                                                         mt-0.5
                                                         text-xs
-                                                        text-slate-500
+                                                        text-neutral-400
                                                     "
                                                 >
                                                     Available before enrollment
@@ -3656,7 +3695,7 @@ function LessonEditor() {
                                                 ${
                                                     formData.isPreview
                                                         ? "bg-[var(--color-primary)]"
-                                                        : "bg-slate-300"
+                                                        : "bg-neutral-800"
                                                 }
                                             `}
                                         >
@@ -3696,7 +3735,7 @@ function LessonEditor() {
                                             block
                                             text-sm
                                             font-medium
-                                            text-slate-700
+                                            text-neutral-300
                                         "
                                     >
                                         Status
@@ -3706,13 +3745,13 @@ function LessonEditor() {
                                         className="
                                             rounded-xl
                                             border
-                                            border-slate-200
-                                            bg-slate-50
+                                            border-[var(--color-border)]
+                                            bg-black/40
                                             px-4
                                             py-3
                                             text-sm
                                             font-medium
-                                            text-slate-600
+                                            text-neutral-300
                                         "
                                     >
                                         {isCreateMode
@@ -3742,8 +3781,8 @@ function LessonEditor() {
                             className="
                                 rounded-2xl
                                 border
-                                border-slate-200
-                                bg-white
+                                border-[var(--color-border)]
+                                bg-[var(--color-surface)]
                                 p-5
                                 shadow-sm
                             "
@@ -3766,10 +3805,11 @@ function LessonEditor() {
                                     px-5
                                     py-3
                                     text-sm
-                                    font-semibold
+                                    font-bold
                                     text-black
                                     shadow-sm
                                     transition
+                                    hover:bg-[var(--color-primary-dark)]
                                     hover:opacity-90
                                     disabled:cursor-not-allowed
                                     disabled:opacity-50
@@ -3818,15 +3858,15 @@ function LessonEditor() {
                                     gap-2
                                     rounded-xl
                                     border
-                                    border-red-200
-                                    bg-white
+                                    border-red-500/30
+                                    bg-red-500/10
                                     px-5
                                     py-3
                                     text-sm
                                     font-semibold
-                                    text-red-600
+                                    text-red-400
                                     transition
-                                    hover:bg-red-50
+                                    hover:bg-red-500/20
                                     disabled:cursor-not-allowed
                                     disabled:opacity-50
                                 "
@@ -3871,6 +3911,17 @@ function LessonEditor() {
                     onInsert={handleEquationInsert}
                 />
             )}
+
+            <ConfirmModal
+                isOpen={deleteModalOpen}
+                onClose={() => setDeleteModalOpen(false)}
+                onConfirm={confirmDelete}
+                title="Delete Lesson"
+                message={`Are you sure you want to delete "${lesson?.title}"? This cannot be undone.`}
+                confirmLabel="Delete"
+                danger={true}
+                isLoading={deleting}
+            />
 
         </div>
     );

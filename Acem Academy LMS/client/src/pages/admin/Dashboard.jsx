@@ -7,12 +7,14 @@ import {
   CheckCircle2,
   ArrowRight,
   TrendingUp,
-  AlertCircle,
   RefreshCw,
 } from "lucide-react";
 
 import { getDashboardStatsApi } from "@/api/admin.api";
 import { ROUTES } from "@/config/routes";
+import { StatCardSkeleton } from "@/components/common/Skeletons";
+import ErrorAlert from "@/components/common/ErrorAlert";
+import EmptyState from "@/components/common/EmptyState";
 
 const Dashboard = () => {
   const {
@@ -20,6 +22,7 @@ const Dashboard = () => {
     isLoading,
     isError,
     error,
+    isFetching,
     refetch,
   } = useQuery({
     queryKey: ["admin-dashboard"],
@@ -60,14 +63,14 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-[1600px] px-6 py-8 lg:px-8">
+      <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {/* Header */}
         <section className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-primary)]">
               Admin Panel
             </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-white md:text-4xl">
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl md:text-4xl">
               System Overview
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-text-muted)]">
@@ -75,14 +78,15 @@ const Dashboard = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             <button
               onClick={() => refetch()}
-              className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.08]"
+              disabled={isFetching}
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.08] disabled:opacity-50"
               title="Refresh statistics"
             >
-              <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-              Refresh
+              <RefreshCw size={16} className={isFetching ? "animate-spin" : ""} />
+              {isFetching ? "Refreshing..." : "Refresh"}
             </button>
             <Link
               to={ROUTES.ADMIN.USERS}
@@ -94,32 +98,32 @@ const Dashboard = () => {
           </div>
         </section>
 
-        {/* Loading State */}
+        {/* Loading Skeletons */}
         {isLoading && (
-          <div className="flex min-h-64 items-center justify-center">
-            <div className="flex items-center gap-3 text-sm text-[var(--color-text-muted)]">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-primary)]" />
-              Loading dashboard statistics...
+          <div className="mt-8 space-y-8">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+            </div>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className="h-64 animate-pulse rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)]" />
+              <div className="h-64 animate-pulse rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)]" />
+              <div className="h-64 animate-pulse rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)]" />
             </div>
           </div>
         )}
 
-        {/* Error State */}
+        {/* Error State with Retry */}
         {!isLoading && isError && (
-          <div className="mt-8 rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-center">
-            <AlertCircle className="mx-auto h-8 w-8 text-red-400" />
-            <p className="mt-3 font-semibold text-red-300">
-              Failed to load dashboard statistics
-            </p>
-            <p className="mt-1 text-sm text-red-400/80">
-              {error?.message || "An unexpected error occurred. Please try again."}
-            </p>
-            <button
-              onClick={() => refetch()}
-              className="mt-4 rounded-xl bg-red-500/20 px-4 py-2 text-sm font-medium text-red-200 transition hover:bg-red-500/30"
-            >
-              Try Again
-            </button>
+          <div className="mt-8">
+            <ErrorAlert
+              error={error}
+              title="Failed to load dashboard statistics"
+              onRetry={() => refetch()}
+              retrying={isFetching}
+            />
           </div>
         )}
 

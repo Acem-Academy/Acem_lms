@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getTeacherStudents } from "../../api/enrollment.api.js";
+import ErrorAlert from "../../components/common/ErrorAlert.jsx";
+import EmptyState from "../../components/common/EmptyState.jsx";
+import { getErrorMessage } from "../../utils/errorHandler.js";
 
 /*
 |--------------------------------------------------------------------------
@@ -54,8 +57,10 @@ const GetStudents = () => {
             );
 
             setError(
-                err?.response?.data?.message ||
+                getErrorMessage(
+                    err,
                     "Failed to load students."
+                )
             );
         } finally {
             setLoading(false);
@@ -386,38 +391,11 @@ const GetStudents = () => {
                 ========================================================== */}
 
                 {error && (
-                    <div
-                        className="mb-6 flex items-center justify-between rounded-xl px-4 py-3"
-                        style={{
-                            backgroundColor:
-                                "rgba(239, 68, 68, 0.08)",
-                            border:
-                                "1px solid rgba(239, 68, 68, 0.3)",
-                        }}
-                    >
-                        <p
-                            className="text-sm font-medium"
-                            style={{
-                                color:
-                                    "var(--color-danger)",
-                            }}
-                        >
-                            {error}
-                        </p>
-
-                        <button
-                            type="button"
-                            onClick={fetchStudents}
-                            className="rounded-lg px-4 py-2 text-sm font-semibold transition hover:opacity-80"
-                            style={{
-                                backgroundColor:
-                                    "var(--color-danger)",
-                                color: "#FFFFFF",
-                            }}
-                        >
-                            Retry
-                        </button>
-                    </div>
+                    <ErrorAlert
+                        message={error}
+                        onRetry={fetchStudents}
+                        className="mb-6"
+                    />
                 )}
 
                 {/* ==========================================================
@@ -520,62 +498,29 @@ const GetStudents = () => {
                 ========================================================== */}
 
                 {filteredStudents.length === 0 ? (
-                    <div
-                        className="rounded-2xl px-6 py-16 text-center"
-                        style={{
-                            backgroundColor:
-                                "var(--color-surface)",
-                            border:
-                                "1px dashed var(--color-border)",
-                        }}
-                    >
-                        <div
-                            className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl"
-                            style={{
-                                backgroundColor:
-                                    "rgba(255, 227, 110, 0.08)",
-                                color:
-                                    "var(--color-primary)",
-                            }}
-                        >
-                            <svg
-                                className="h-8 w-8"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="1.8"
-                                    d="M15 19a4 4 0 0 0-8 0m4-8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8 8a4 4 0 0 0-4-4m2-4a3 3 0 1 0 0-6"
-                                />
-                            </svg>
-                        </div>
-
-                        <h3
-                            className="mt-5 text-lg font-semibold"
-                            style={{
-                                color:
-                                    "var(--color-text-secondary)",
-                            }}
-                        >
-                            No students found
-                        </h3>
-
-                        <p
-                            className="mx-auto mt-2 max-w-md text-sm"
-                            style={{
-                                color:
-                                    "var(--color-text-muted)",
-                            }}
-                        >
-                            {search ||
-                            courseFilter !== "all"
-                                ? "Try changing your search or course filter."
-                                : "Students enrolled in your courses will appear here."}
-                        </p>
-                    </div>
+                    <EmptyState
+                        title={
+                            search || courseFilter !== "all"
+                                ? "No matching students found"
+                                : "No students enrolled yet"
+                        }
+                        description={
+                            search || courseFilter !== "all"
+                                ? "Try adjusting your search terms or course filter to find what you're looking for."
+                                : "Students enrolled in your courses will appear here once they enroll."
+                        }
+                        secondaryAction={
+                            search || courseFilter !== "all"
+                                ? {
+                                      label: "Clear Filters",
+                                      onClick: () => {
+                                          setSearch("");
+                                          setCourseFilter("all");
+                                      },
+                                  }
+                                : undefined
+                        }
+                    />
                 ) : (
                     <>
                         {/* ==================================================

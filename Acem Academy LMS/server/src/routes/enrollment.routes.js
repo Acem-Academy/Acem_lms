@@ -5,6 +5,7 @@ const enrollmentController = require("../controllers/enrollment.controller");
 const {
     enrollStudentValidator,
     enrollmentIdValidator,
+    lessonProgressValidator,
 } = require("../validators/enrollment.validator");
 
 const authenticate = require("../middlewares/auth.middleware");
@@ -109,6 +110,9 @@ router.patch(
 router.post(
     "/:enrollmentId/lessons/:lessonId/start",
     authenticate,
+    authorize(ROLES.STUDENT),
+    lessonProgressValidator,
+    validate,
     enrollmentController.startLesson
 );
 
@@ -121,6 +125,9 @@ router.post(
 router.post(
     "/:enrollmentId/lessons/:lessonId/complete",
     authenticate,
+    authorize(ROLES.STUDENT),
+    lessonProgressValidator,
+    validate,
     enrollmentController.completeLesson
 );
 

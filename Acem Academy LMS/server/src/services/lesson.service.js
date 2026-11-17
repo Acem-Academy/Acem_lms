@@ -982,11 +982,17 @@ const submitQuiz = async (
             ? Number(quiz.passingScore)
             : 70;
 
+    const explanations = quiz.questions.map((question, index) => ({
+        questionIndex: index,
+        explanation: question.explanation || "",
+    }));
+
     const result = {
         earnedPoints,
         totalPoints,
         percentage,
         passed: percentage >= passingScore,
+        explanations,
     };
 
     /*
