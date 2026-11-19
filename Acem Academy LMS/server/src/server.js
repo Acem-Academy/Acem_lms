@@ -33,6 +33,8 @@ const getAllowedOrigins = () => {
         "http://localhost:3000",
         "http://127.0.0.1:5173",
         "https://acemlms-client.vercel.app",
+       "http://acemacademy.com",
+    "https://www.acemacademy.com",
     ];
     const configuredOrigins = process.env.CLIENT_URL || process.env.CORS_ORIGIN;
 
